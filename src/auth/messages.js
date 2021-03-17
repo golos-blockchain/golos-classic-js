@@ -9,36 +9,60 @@ const toPrivateObj = o => (o ? o.d ? o : PrivateKey.fromWif(o) : o/*null or unde
 const toPublicObj = o => (o ? o.Q ? o : PublicKey.fromString(o) : o/*null or undefined*/)
 
 /**
-    Decodes messages of format using golos.messages.encode(), which are length-prefixed, and also messages sent by another way (not length-prefixed)
-    @arg {string|PrivateKey} private_memo_key - private memo key of "from" or "to"
-    @arg {string|PublicKey} second_user_public_memo_key - public memo key of second user
-    @arg {object} message_object - object which contains nonce, checksum and encrypted_message (such object returns from private_message API)
-    @return {string} - UTF-8 decoded string
+    Decodes messages of format used by golos.messages.encode(), which are length-prefixed, and also messages sent by another way (not length-prefixed). Processes whole incoming array, or only part of it. Can process in reversed order.
+    @arg {string|PrivateKey} private_memo_key - private memo key of "from" or "to".
+    @arg {string|PublicKey} second_user_public_memo_key - public memo key of second user.
+    @arg {array} message_objects - array of objects. Each object which contains nonce, checksum and encrypted_message (such object returns from private_message API).
+    @arg {function|null} for_each - callback, calling on each message, after message is decoded, but before add it to result array. Params are (message, idx). If callback not returns true, message willn't be added to result array.
+    @arg {int|null} begin_idx - if set, function will process messages only from it index (incl.). If begin_idx > end_idx, messages will be processed in reversed order.
+    @arg {int|null} end_idx - if set, function will process messages only before it index (excl.). If end_idx < begin_idx, messages will be processed in reversed order.
+    @arg {function|null} on_error - callback, calling on each message which can't be decrypted. Params are (message, idx, exception). If returns true, message (without `message` field) will be added to result array.
+    @return {array} - result array of message_objects.
 */
-export function decode(private_memo_key, second_user_public_memo_key, message_object) {
+export function decode(private_memo_key, second_user_public_memo_key, message_objects, for_each, begin_idx, end_idx, on_error) {
     assert(private_memo_key, 'private_memo_key is required');
     assert(second_user_public_memo_key, 'second_user_public_memo_key is required');
-    assert(message_object, 'message_object is required');
+    assert(message_objects, 'message_objects is required');
+    if (!end_idx) end_idx = message_objects.length;
+    if (!begin_idx) begin_idx = 0;
+    const step = end_idx > begin_idx ? 1 : -1;
 
-    const privateKey = toPrivateObj(private_memo_key);
-    const publicKey = toPublicObj(second_user_public_memo_key);
+    const private_key = toPrivateObj(private_memo_key);
+    const public_key = toPublicObj(second_user_public_memo_key);
+    let shared_secret = private_key.get_shared_secret(public_key);
 
-    let decrypted = Aes.decrypt(privateKey, publicKey,
-        message_object.nonce.toString(),
-        Buffer.from(message_object.encrypted_message, 'hex'),
-        message_object.checksum);
+    let results = [];
+    for (let i = begin_idx; i != end_idx; i += step) {
+        const message_object = message_objects[i];
 
-    const mbuf = ByteBuffer.fromBinary(decrypted.toString('binary'), ByteBuffer.DEFAULT_CAPACITY, ByteBuffer.LITTLE_ENDIAN)
-    try {
-        mbuf.mark()
-        decrypted = mbuf.readVString()
-    } catch(e) {
-        mbuf.reset()
-        // Sender did not length-prefix the memo
-        decrypted = new Buffer(mbuf.toString('binary'), 'binary').toString('utf-8')
+        try {
+            let decrypted = Aes.decrypt(shared_secret, null,
+                message_object.nonce.toString(),
+                Buffer.from(message_object.encrypted_message, 'hex'),
+                message_object.checksum);
+
+            const mbuf = ByteBuffer.fromBinary(decrypted.toString('binary'), ByteBuffer.DEFAULT_CAPACITY, ByteBuffer.LITTLE_ENDIAN)
+            try {
+                mbuf.mark()
+                decrypted = mbuf.readVString()
+            } catch(e) {
+                mbuf.reset()
+                // Sender did not length-prefix the memo
+                decrypted = new Buffer(mbuf.toString('binary'), 'binary').toString('utf-8')
+            }
+
+            decrypted = decrypted.toString();
+            message_object.message = decrypted;
+            if (!for_each || for_each(message_object, i)) {
+                results.push(message_object);
+            }
+        } catch (exception) {
+            if (on_error && on_error(message_object, i, exception)) {
+                results.push(message_object);
+            }
+        }
     }
-
-    return decrypted.toString();
+    return results;
 }
 
 /**
@@ -63,6 +87,8 @@ export function encode(from_private_memo_key, to_public_memo_key, message) {
     let data = Aes.encrypt(fromKey,
         toKey,
         message);
-    data.message = data.message.toString('hex');
+    data.encrypted_message = data.message;
+    delete data.message;
+    data.encrypted_message = data.encrypted_message.toString('hex');
     return data;
 }

@@ -1378,19 +1378,12 @@ golos.broadcast.customJson('alice private posting key', [], ['alice'], 'private_
 
 ### Obtain and decrypt
 
-Message can be obtained with `golos.api.getThread`, each message is object with `from_memo_key`, `to_memo_key`, `nonce`, `checksum`, `encrypted_message` and another fields.
+Message can be obtained with `golos.api.getThread`, each message is object with `from_memo_key`, `to_memo_key`, `nonce`, `checksum`, `encrypted_message` and another fields. Next message can be decrypted with `golos.memo.decode` which supports batch processing (can decrypt few messages at once) and provides good performance.
 
 ```
 golos.api.getThread('alice', 'bob', {}, (err, results) => {
-    let message = results[0];
-    let someone_public_key;
-    if (alice_public_memo_key === message.to_memo_key) {
-        someone_public_key = message.from_memo_key;
-    } else {
-        someone_public_key = message.to_memo_key;
-    }
-    let str = golos.messages.decode('alice private key', someone_public_key, message);
-    alert(str);
+    results = golos.messages.decode('alice private key', 'bob public memo key', results);
+    alert(results[0].message);
 });
 ```
 

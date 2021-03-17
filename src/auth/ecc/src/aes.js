@@ -11,8 +11,8 @@ const Long = ByteBuffer.Long;
 /**
     Spec: http://localhost:3002/steem/@dantheman/how-to-encrypt-a-memo-when-transferring-steem
     @throws {Error|TypeError} - "Invalid Key, ..."
-    @arg {PrivateKey} private_key - required and used for decryption
-    @arg {PublicKey} public_key - required and used to calcualte the shared secret
+    @arg {PrivateKey|Uint8Array} private_key - required and used for decryption. If you have many messages to decrypt, it is faster to pass prepared shared_secret, instead of private_key
+    @arg {PublicKey} public_key - required (if private_key_or_shared_secret is not a shared secret) and used to calculate the shared secret
     @arg {string} [nonce = uniqueNonce()] - assigned a random unique uint64
 
     @return {object}
@@ -20,36 +20,43 @@ const Long = ByteBuffer.Long;
     @property {Buffer} message - Plain text message
     @property {number} checksum - shared secret checksum
 */
-export function encrypt(private_key, public_key, message, nonce = uniqueNonce()) {
-    return crypt(private_key, public_key, nonce, message)
+export function encrypt(private_key_or_shared_secret, public_key, message, nonce = uniqueNonce()) {
+    return crypt(private_key_or_shared_secret, public_key, nonce, message)
 }
 
 /**
     Spec: http://localhost:3002/steem/@dantheman/how-to-encrypt-a-memo-when-transferring-steem
-    @arg {PrivateKey} private_key - required and used for decryption
-    @arg {PublicKey} public_key - required and used to calcualte the shared secret
+    @arg {PrivateKey|Uint8Array} private_key_or_shared_secret - required and used for decryption. If you have many messages to decrypt, it is faster to pass prepared shared_secret, instead of private_key
+    @arg {PublicKey} public_key - required (if private_key_or_shared_secret is not a shared secret) and used to calculate the shared secret
     @arg {string} nonce - random or unique uint64, provides entropy when re-using the same private/public keys.
     @arg {Buffer} message - Encrypted or plain text message
     @arg {number} checksum - shared secret checksum
     @throws {Error|TypeError} - "Invalid Key, ..."
     @return {Buffer} - message
 */
-export function decrypt(private_key, public_key, nonce, message, checksum) {
-    return crypt(private_key, public_key, nonce, message, checksum).message
+export function decrypt(private_key_or_shared_secret, public_key, nonce, message, checksum) {
+    return crypt(private_key_or_shared_secret, public_key, nonce, message, checksum).message
 }
 
 /**
     @arg {Buffer} message - Encrypted or plain text message (see checksum)
     @arg {number} checksum - shared secret checksum (null to encrypt, non-null to decrypt)
 */
-function crypt(private_key, public_key, nonce, message, checksum) {
-    private_key = toPrivateObj(private_key)
-    if (!private_key)
-        throw new TypeError('private_key is required')
+function crypt(private_key_or_shared_secret, public_key, nonce, message, checksum) {
+    let shared_secret;
+    if (!private_key_or_shared_secret.d && typeof private_key_or_shared_secret !== 'string') {
+        shared_secret = private_key_or_shared_secret;
+    } else {
+        const private_key = toPrivateObj(private_key_or_shared_secret)
+        if (!private_key)
+            throw new TypeError('private_key is required')
 
-    public_key = toPublicObj(public_key)
-    if (!public_key)
-        throw new TypeError('public_key is required')
+        public_key = toPublicObj(public_key)
+        if (!public_key)
+            throw new TypeError('public_key is required')
+
+        shared_secret = private_key.get_shared_secret(public_key);
+    }
 
     nonce = toLongObj(nonce)
     if (!nonce)
@@ -63,10 +70,9 @@ function crypt(private_key, public_key, nonce, message, checksum) {
     if (checksum && typeof checksum !== 'number')
         throw new TypeError('checksum should be a number')
 
-    const S = private_key.get_shared_secret(public_key);
     let ebuf = new ByteBuffer(ByteBuffer.DEFAULT_CAPACITY, ByteBuffer.LITTLE_ENDIAN)
     ebuf.writeUint64(nonce)
-    ebuf.append(S.toString('binary'), 'binary')
+    ebuf.append(shared_secret.toString('binary'), 'binary')
     ebuf = new Buffer(ebuf.copy(0, ebuf.offset).toBinary(), 'binary')
     const encryption_key = hash.sha512(ebuf)
 
@@ -77,7 +83,7 @@ function crypt(private_key, public_key, nonce, message, checksum) {
     //     nonce: nonce.toString(),
     //     message: message.length,
     //     checksum,
-    //     S: S.toString('hex'),
+    //     shared_secret: shared_secret.toString('hex'),
     //     encryption_key: encryption_key.toString('hex'),
     // })
 
