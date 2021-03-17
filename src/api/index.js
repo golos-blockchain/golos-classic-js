@@ -25,8 +25,10 @@ class Golos extends EventEmitter {
   _setTransport(url) {
       if (url && url.match('^((http|https)?:\/\/)')) {
         this.transport = new transports.http();
+        this.url = url;
       } else if (url && url.match('^((ws|wss)?:\/\/)')) {
         this.transport = new transports.ws();
+        this.url = url;
       } else {
       throw Error("unknown transport! [" + url + "]");
     }
@@ -50,13 +52,21 @@ class Golos extends EventEmitter {
     debugSetup('Stopping...');
     const ret = this.transport.stop();
     this.transport = null;
+    this.url = null;
     return ret;
   }
 
   send(api, data, callback) {
     debugSetup('Golos::send', api, data);
     if (!this.transport) {
+      this.start();
+    } else {
+      let url = config.get('websocket');
+      if (url !== this.url) {
+        debugSetup('websocket URL changed, restarting transport...');
+        this.stop();
         this.start();
+      }
     }
     return this.transport.send(api, data, callback);
   }
