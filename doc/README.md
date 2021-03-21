@@ -1348,7 +1348,7 @@ Golos Blockchain provides instant messages subsystem, which allows users communi
 
 Messages are stringified JSON objects. If you want they showing in Golos Blogs or Golos forums, you should use stringified JSON-objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `golos-id` and `version` as 1.
 
-Stringified JSON-object message should be enciphered (uses SHA-512 with nonce, which is a UNIX timestamp in microseconds, and AES), and converted to HEX string. You can do it easy with `golos.messages.encode` function.
+Stringified JSON-object message should be enciphered (uses SHA-512 with nonce, which is a UNIX timestamp-based unique identifier, and AES), and converted to HEX string. You can do it easy with `golos.messages.encode` function.
 
 Example: 
 
@@ -1358,7 +1358,7 @@ let message = {
     version: 1,
     body: 'Hello world',
 }
-let data = golos.messages.encode('alice private memo key', 'bob public memo key', JSON.stringify(message'));
+let data = golos.messages.encode('alice private memo key', 'bob public memo key', JSON.stringify(message));
 
 const json = JSON.stringify(['private_message', {
     from: 'alice',
@@ -1368,13 +1368,23 @@ const json = JSON.stringify(['private_message', {
     to_memo_key: 'bob public memo key',
     checksum: data.checksum,
     update: false,
-    encrypted_message: data.message,
+    encrypted_message: data.encrypted_message,
 }]);
 golos.broadcast.customJson('alice private posting key', [], ['alice'], 'private_message', json, (err, result) => {
     alert(err);
     alert(JSON.stringify(result));
 });
 ```
+
+### Edit message
+
+Messages are identifying by from+to+nonce, so when you updating message, you should encode it with same nonce as in its previous version.
+
+```
+data = golos.messages.encode('alice private memo key', 'bob public memo key', JSON.stringify(message), data.nonce);
+```
+
+Next, this data should be sent with `private_message` operation, same as in previous case, but with `update` = `true`.
 
 ### Obtain and decrypt
 

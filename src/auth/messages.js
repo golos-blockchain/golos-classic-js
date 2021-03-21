@@ -13,13 +13,14 @@ const toPublicObj = o => (o ? o.Q ? o : PublicKey.fromString(o) : o/*null or und
     @arg {string|PrivateKey} private_memo_key - private memo key of "from" or "to".
     @arg {string|PublicKey} second_user_public_memo_key - public memo key of second user.
     @arg {array} message_objects - array of objects. Each object which contains nonce, checksum and encrypted_message (such object returns from private_message API).
-    @arg {function|null} for_each - callback, calling on each message, after message is decoded, but before add it to result array. Params are (message, idx). If callback not returns true, message willn't be added to result array.
-    @arg {int|null} begin_idx - if set, function will process messages only from it index (incl.). If begin_idx > end_idx, messages will be processed in reversed order.
-    @arg {int|null} end_idx - if set, function will process messages only before it index (excl.). If end_idx < begin_idx, messages will be processed in reversed order.
-    @arg {function|null} on_error - callback, calling on each message which can't be decrypted. Params are (message, idx, exception). If returns true, message (without `message` field) will be added to result array.
+    @arg {function|undefined} for_each - callback, calling on each message, after message is decoded, but before add it to result array. Params are (message, idx). If callback not returns true, message willn't be added to result array.
+    @arg {int|undefined} begin_idx - if set, function will process messages only from it index (incl.). If begin_idx > end_idx, messages will be processed in reversed order.
+    @arg {int|undefined} end_idx - if set, function will process messages only before it index (excl.). If end_idx < begin_idx, messages will be processed in reversed order.
+    @arg {function|undefined} on_error - callback, calling on each message which can't be decrypted. Params are (message, idx, exception). If returns true, message (without `message` field) will be added to result array.
+    @arg {function|undefined} before_decode - callback, calling on each message before decrypting. Params are (message, idx, results). If returns false, message will not be decrypted. Also, you can push it to `results` manually.
     @return {array} - result array of message_objects.
 */
-export function decode(private_memo_key, second_user_public_memo_key, message_objects, for_each, begin_idx, end_idx, on_error) {
+export function decode(private_memo_key, second_user_public_memo_key, message_objects, for_each, begin_idx, end_idx, on_error, before_decode) {
     assert(private_memo_key, 'private_memo_key is required');
     assert(second_user_public_memo_key, 'second_user_public_memo_key is required');
     assert(message_objects, 'message_objects is required');
@@ -27,13 +28,22 @@ export function decode(private_memo_key, second_user_public_memo_key, message_ob
     if (!begin_idx) begin_idx = 0;
     const step = end_idx > begin_idx ? 1 : -1;
 
-    const private_key = toPrivateObj(private_memo_key);
-    const public_key = toPublicObj(second_user_public_memo_key);
-    let shared_secret = private_key.get_shared_secret(public_key);
+    let shared_secret;
 
     let results = [];
     for (let i = begin_idx; i != end_idx; i += step) {
         const message_object = message_objects[i];
+
+        if (before_decode && !before_decode(message_object, i, results)) {
+            continue;
+        }
+
+        // Most "heavy" lines
+        if (!shared_secret) {
+            const private_key = toPrivateObj(private_memo_key);
+            const public_key = toPublicObj(second_user_public_memo_key);
+            shared_secret = private_key.get_shared_secret(public_key);
+        }
 
         try {
             let decrypted = Aes.decrypt(shared_secret, null,
@@ -70,9 +80,10 @@ export function decode(private_memo_key, second_user_public_memo_key, message_ob
     @arg {string|PrivateKey} from_private_memo_key - private memo key of "from"
     @arg {string|PublicKey} to_public_memo_key - private memo key of "to"
     @arg {string} message - message to encode. Please use JSON string like: '{"app":"golos-id","version":1,"body":"World"}'.
+    @arg {string|undefined} nonce - unique identifier of message. When editing message, set to its nonce. Otherwise keep undefined.
     @return {object} - Object with fields: nonce, checksum and message. To use in operation, nonce should be converted with toString(), and another fields are ready to use.
 */
-export function encode(from_private_memo_key, to_public_memo_key, message) {
+export function encode(from_private_memo_key, to_public_memo_key, message, nonce = undefined) {
     assert(from_private_memo_key, 'from_private_memo_key is required');
     assert(to_public_memo_key, 'to_public_memo_key is required');
     assert(message, 'message is required');
@@ -86,7 +97,8 @@ export function encode(from_private_memo_key, to_public_memo_key, message) {
 
     let data = Aes.encrypt(fromKey,
         toKey,
-        message);
+        message,
+        nonce);
     data.encrypted_message = data.message;
     delete data.message;
     data.encrypted_message = data.encrypted_message.toString('hex');
