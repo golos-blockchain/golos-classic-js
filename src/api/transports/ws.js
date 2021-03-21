@@ -60,6 +60,7 @@ export default class WsTransport extends Transport {
         }
 
         for (let [id, val] of Object.entries(this.callbacks)) {
+          delete this.callbacks[id];
           val.cb(err, null);
         }
       });
