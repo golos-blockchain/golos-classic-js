@@ -1,6 +1,6 @@
 {
   "name": "golos-classic-js",
-  "version": "0.7.92",
+  "version": "0.7.94",
   "description": "Golos-js the JavaScript library with API for GOLOS blockchain",
   "main": "lib/index.js",
   "scripts": {
@@ -10,7 +10,6 @@
     "build": "npm run build-browser && npm run build-node",
     "build-browser": "rm -rf dist && NODE_ENV=production webpack && gzip -k -f ./dist/*.js && du -h ./dist/*",
     "build-node": "mkdir -p ./lib && cp -r ./src/* ./lib/ && babel ./src --out-dir ./lib",
-    "prepublish": "npm run build",
     "disable-test-prepublish": "npm run test && npm run build"
   },
   "browser": {

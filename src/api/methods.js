@@ -602,6 +602,7 @@ module.exports = [
   {
     "api": "private_message",
     "method": "get_settings",
+    "method_name": "getPrivateMessagesSettings",
     "params": ["owner"]
   },
   {
