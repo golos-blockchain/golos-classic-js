@@ -1397,6 +1397,41 @@ golos.api.getThread('alice', 'bob', {}, (err, results) => {
 });
 ```
 
+### Mark Messages Read & Delete Messages
+
+Blockchain provides `private_mark_message` operation for marking messages as read, and `private_delete_message` to delete them.
+Each of these operations can be used one of two cases:
+- to process 1 message: set `nonce` to message nonce,
+- to process range of few messages: set `start_date` to (1st message's create_date minus 1 sec), and `stop-date` to last message's create_date.
+Also, you can process multiple ranges of messages by combining few operations in single transaction.
+
+**Note: you should not use case with `nonce` if processing 2 or more sequential messages.**
+
+To make ranges, you can use `golos.messages.makeGroups`, which builds such ranges by a condition, and can wrap them into real operations in-place.
+
+It accepts decoded messages from `golos.messages.decode`.
+
+**Note: function should iterate messages from end to start.**
+
+```
+let results = golos.messages.makeGroups(messages, (message_object, idx) => {
+    return message_object.read_date.startsWith('19') && message_object.from !== 'bob'; // unread and not by bob
+}, (group, indexes, results) => {
+    const json = JSON.stringify(['private_mark_message', {
+        from: 'alice',
+        to: 'bob',
+        ...group,
+    }]);
+    return ['custom_json',
+        {
+            id: 'private_message',
+            required_posting_auths: ['bob'],
+            json,
+        }
+    ];
+}, 0, messages.length - 1); // specify right direction of iterating
+```
+
 # Formatter
 
 ### Create Suggested Password
