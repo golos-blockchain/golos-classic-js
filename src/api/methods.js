@@ -191,6 +191,7 @@ module.exports = [
       `voteOffset=${DEFAULT_VOTES_OFFSET}`,
       `filterIds=${EMPTY_ARRAY}`,
       `filterAuthors=${EMPTY_ARRAY}`,
+      `categoryPrefix=${EMPTY_STRING}`,
     ]
   },
   {
