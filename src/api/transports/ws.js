@@ -54,8 +54,14 @@ export default class WsTransport extends Transport {
         delete this.ws;
         this.stop();
 
+        const err = new Error('The WS connection was closed before this operation was made');
         if (startP.isPending()) {
-          reject(new Error('The WS connection was closed before this operation was made'));
+          reject(err);
+        }
+
+        for (let [id, val] of Object.entries(this.callbacks)) {
+          delete this.callbacks[id];
+          val.cb(err, null);
         }
       });
 

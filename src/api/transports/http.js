@@ -66,9 +66,11 @@ export default class HttpTransport extends Transport {
       const url = config.get("websocket");
       jsonRpc(url, {method: 'call', id, params})
         .then(res => {
-          this._requests[res.id].resolve(res.result)
+          this._requests[res.id].resolve(res.result);
+          delete this._requests[res.id];
         }, err => {
-          this._requests[err.resid].reject(err)
+          this._requests[err.resid].reject(err);
+          delete this._requests[err.resid];
         })
       })
       .nodeify(callback);

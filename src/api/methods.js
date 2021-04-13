@@ -191,6 +191,7 @@ module.exports = [
       `voteOffset=${DEFAULT_VOTES_OFFSET}`,
       `filterIds=${EMPTY_ARRAY}`,
       `filterAuthors=${EMPTY_ARRAY}`,
+      `categoryPrefix=${EMPTY_STRING}`,
     ]
   },
   {
@@ -266,6 +267,11 @@ module.exports = [
     "api": "social_network",
     "method": "get_donates",
     "params": ["uia", "target", "from", "to", "limit", "offset", "join_froms"]
+  },
+  {
+    "api": "social_network",
+    "method": "get_donates_for_targets",
+    "params": ["targets", "limit", "offset", "join_froms"]
   },
   {
     "api": "database_api",
@@ -597,6 +603,7 @@ module.exports = [
   {
     "api": "private_message",
     "method": "get_settings",
+    "method_name": "getPrivateMessagesSettings",
     "params": ["owner"]
   },
   {

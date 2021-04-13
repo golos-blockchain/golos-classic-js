@@ -4,6 +4,7 @@ const broadcast = require("./broadcast");
 const config = require("./config");
 const formatter = require("./formatter")(api);
 const memo = require('./auth/memo');
+const messages = require('./auth/messages');
 const utils = require("./utils");
 
 const golos = {
@@ -13,6 +14,7 @@ const golos = {
   config,
   formatter,
   memo,
+  messages,
   utils
 };
 

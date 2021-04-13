@@ -19,6 +19,7 @@
 - [Broadcast API](#broadcast-api)
 - [Broadcast](#broadcast)
 - [Auth](#auth)
+- [Private Messages](#private-messages)
 - [Formatter](#formatter)
 - [Utils](#utils)
 
@@ -1356,6 +1357,98 @@ console.log('wifToPublic', resultWifToPublic);
 ### Sign Transaction
 ```
 golos.auth.signTransaction(trx, keys);
+```
+
+# Private Messages
+
+Golos Blockchain provides instant messages subsystem, which allows users communicate with encrypted private messages. Messages are encrypting on client-side (using sender's private memo key and recipient's public memo key), sending to blockchain via `private_message_operation`, and next can be obtained from DB with `private_message` API, and decrypted on client-side (using private memo key of from/to and public memo key of another user).
+
+### Encrypt and send
+
+Messages are stringified JSON objects. If you want they showing in Golos Blogs or Golos forums, you should use stringified JSON-objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `golos-id` and `version` as 1.
+
+Stringified JSON-object message should be enciphered (uses SHA-512 with nonce, which is a UNIX timestamp-based unique identifier, and AES), and converted to HEX string. You can do it easy with `golos.messages.encode` function.
+
+Example: 
+
+```
+let message = {
+    app: 'golos-id',
+    version: 1,
+    body: 'Hello world',
+}
+let data = golos.messages.encode('alice private memo key', 'bob public memo key', JSON.stringify(message));
+
+const json = JSON.stringify(['private_message', {
+    from: 'alice',
+    to: 'bob',
+    nonce: data.nonce.toString(),
+    from_memo_key: 'alice PUBLIC memo key',
+    to_memo_key: 'bob public memo key',
+    checksum: data.checksum,
+    update: false,
+    encrypted_message: data.encrypted_message,
+}]);
+golos.broadcast.customJson('alice private posting key', [], ['alice'], 'private_message', json, (err, result) => {
+    alert(err);
+    alert(JSON.stringify(result));
+});
+```
+
+### Edit message
+
+Messages are identifying by from+to+nonce, so when you updating message, you should encode it with same nonce as in its previous version.
+
+```
+data = golos.messages.encode('alice private memo key', 'bob public memo key', JSON.stringify(message), data.nonce);
+```
+
+Next, this data should be sent with `private_message` operation, same as in previous case, but with `update` = `true`.
+
+### Obtain and decrypt
+
+Message can be obtained with `golos.api.getThread`, each message is object with `from_memo_key`, `to_memo_key`, `nonce`, `checksum`, `encrypted_message` and another fields. Next message can be decrypted with `golos.memo.decode` which supports batch processing (can decrypt few messages at once) and provides good performance.
+
+```
+golos.api.getThread('alice', 'bob', {}, (err, results) => {
+    results = golos.messages.decode('alice private key', 'bob public memo key', results);
+    alert(results[0].message);
+});
+```
+
+### Mark Messages Read & Delete Messages
+
+Blockchain provides `private_mark_message` operation for marking messages as read, and `private_delete_message` to delete them.
+Each of these operations can be used one of two cases:
+- to process 1 message: set `nonce` to message nonce,
+- to process range of few messages: set `start_date` to (1st message's create_date minus 1 sec), and `stop-date` to last message's create_date.
+Also, you can process multiple ranges of messages by combining few operations in single transaction.
+
+**Note: you should not use case with `nonce` if processing 2 or more sequential messages.**
+
+To make ranges, you can use `golos.messages.makeGroups`, which builds such ranges by a condition, and can wrap them into real operations in-place.
+
+It accepts decoded messages from `golos.messages.decode`.
+
+**Note: function should iterate messages from end to start.**
+
+```
+let results = golos.messages.makeGroups(messages, (message_object, idx) => {
+    return message_object.read_date.startsWith('19') && message_object.from !== 'bob'; // unread and not by bob
+}, (group, indexes, results) => {
+    const json = JSON.stringify(['private_mark_message', {
+        from: 'alice',
+        to: 'bob',
+        ...group,
+    }]);
+    return ['custom_json',
+        {
+            id: 'private_message',
+            required_posting_auths: ['bob'],
+            json,
+        }
+    ];
+}, 0, messages.length - 1); // specify right direction of iterating
 ```
 
 # Formatter
