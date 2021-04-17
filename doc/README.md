@@ -1393,9 +1393,18 @@ Message can be obtained with `golos.api.getThread`, each message is object with 
 ```
 golos.api.getThread('alice', 'bob', {}, (err, results) => {
     results = golos.messages.decode('alice private key', 'bob public memo key', results);
-    alert(results[0].message);
+    alert(results[0].message.body);
 });
 ```
+
+**Note:** it also validates messages to correspond the following rules:
+- message should be a correct JSON object, with fields corresponding to rules below;
+- `app` field should be a string with length from 1 to 16;
+- `version` field should be an integer, starting from 1;
+- `body` should be a string;
+- for image messages: `previewWidth` and `previewHeight` should be the integers, which are result of fitting an image to 600x300 px area. 
+
+**Note:** if message cannot be decoded, parsed as JSON and/or validated, it still adding to result, but has `message: null` (if cannot be parsed as JSON, or validated), and `raw_message: null` (if cannot be decoded at all). Such behaviour allows client to mark this message as read, but not display it to user. If you want to change this behaviour, you can use `on_error` parameter in `golos.messages.decode` (see the source code for more details).
 
 ### Mark Messages Read & Delete Messages
 
