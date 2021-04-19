@@ -132,3 +132,23 @@ export function validateAccountName(value) {
 
   return res;
 }
+
+export function fitImageToSize(width, height, goodWidth, goodHeight) {
+    let overWidth = width / goodWidth;
+    let overHeight = height / goodHeight;
+
+    if (overWidth <= 1 && overHeight <= 1) {
+        return { width, height };
+    }
+
+    let proportion = width / height;
+
+    if (overWidth > overHeight) {
+        width = goodWidth;
+        height = Math.round(width / proportion);
+    } else {
+        height = goodHeight;
+        width = Math.round(height * proportion);
+    }
+    return { width, height };
+}

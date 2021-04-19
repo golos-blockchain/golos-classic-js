@@ -2,11 +2,23 @@
 import ByteBuffer from 'bytebuffer'
 import assert from 'assert'
 import base58 from 'bs58'
+import Promise from 'bluebird';
 import {Aes, PrivateKey, PublicKey} from './ecc'
 import {ops} from './serializer'
+import {fitImageToSize} from '../utils';
 const {isInteger} = Number
 
+/** @const {string} DEFAULT_APP 
+    @default 'golos-id' */
+export const DEFAULT_APP = 'golos-id';
+/** @const {string} DEFAULT_VERSION 
+    @default 1 */
+export const DEFAULT_VERSION = 1;
+/** @const {string} MAX_PREVIEW_WIDTH 
+    @default 600 */
 export const MAX_PREVIEW_WIDTH = 600;
+/** @const {string} MAX_PREVIEW_HEIGHT 
+    @default 300 */
 export const MAX_PREVIEW_HEIGHT = 300;
 
 const toPrivateObj = o => (o ? o.d ? o : PrivateKey.fromWif(o) : o/*null or undefined*/)
@@ -30,6 +42,104 @@ function validateImageMsg(msg) {
     assert(isInteger(msg.previewHeight) && msg.previewHeight >= 1 && msg.previewHeight <= MAX_PREVIEW_HEIGHT,
         'message.previewHeight (for image) should be an integer, >= 1, <= ' + MAX_PREVIEW_HEIGHT);
 }
+
+/**
+    Creates new message, which can be encoded by golos.messages.encode.
+    @arg {string} text - text ("body") of the message.
+    @arg {string} [app = DEFAULT_APP] - "app" field of the message. Should be a string with length from 1 to 16.
+    @arg {string} [version = DEFAULT_VERSION] - "version" field of the message. Should be an integer, starting of 1.
+    @throws {Exception} when supplied data is invalid.
+    @return {object} - result message object.
+*/
+export function newTextMsg(text, app = DEFAULT_APP, version = DEFAULT_VERSION) {
+    validateBody(text);
+    validateAppVersion(app, version);
+    const msg = {
+        app,
+        version,
+        body: text,
+    };
+    return msg;
+}
+
+/**
+    Creates new image message, which can be encoded by golos.messages.encode.
+    @arg {string} image_url - URL of the image in the Internet (please use https://, and store images in image hostings, to make them storing eternally). This URL will be a "body" of the message.
+    @arg {function} callback - callback. Params are <code>(err, message)</code>. Calling after message construction (err is null in this case), or if error occured (err is exception, message is null).
+    @arg {function} [on_progress = undefined] - progress callback. Params are <code>(percent, extra_data)</code>. Percent is integer from 1 to 100.
+    @arg {string} [app = DEFAULT_APP] - "app" field of the message. Should be a string with length from 1 to 16.
+    @arg {string} [version = DEFAULT_VERSION] - "version" field of the message. Should be an integer, starting of 1.
+    @throws {Exception} only if callback called due error, and callback also throws error. So callback shouldn't throw errors.
+*/
+exports.newImageMsg = function(image_url, callback, on_progress = undefined, app = DEFAULT_APP, version = DEFAULT_VERSION) {
+    try {
+        assert(typeof Image !== 'undefined', 'Current environment does not support Image()');
+        assert(image_url, 'image_url is required');
+
+        let reportProgress = (progress, error) => {
+            if (on_progress) on_progress(progress, {error});
+        };
+
+        reportProgress(0);
+
+        let reportLoadError = (errorText) => {
+            const err = new Error(errorText);
+            reportProgress(100, err);
+            callback(err, null);
+        };
+
+        let img = new Image();
+        let watchdog;
+        let clearWatchdog = () => {
+            if (watchdog) clearTimeout(watchdog);
+        };
+        img.onerror = img.onabort = () => {
+            clearWatchdog();
+            reportLoadError('Cannot load image');
+        };
+        img.onload = () => {
+            clearWatchdog();
+            reportProgress(100);
+            const previewSize = fitImageToSize(img.width, img.height, MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT);
+            const msg = {
+                app,
+                version,
+                body: image_url,
+                type: 'image',
+                previewWidth: previewSize.width,
+                previewHeight: previewSize.height,
+            };
+            validateImageMsg(msg);
+            callback(null, msg);
+        };
+        watchdog = setTimeout(() => {
+            if (!img.complete) {
+                img.onload = img.onerror = img.onabort = {};
+                reportLoadError('Image load timed out, maybe it is too large');
+            }
+        }, 5000);
+        img.src = image_url;
+    } catch (err) {
+        reportProgress(100, err);
+        callback(err, null);
+    }
+};
+
+/**
+    Creates new image message, which can be encoded by golos.messages.encode. Async version of function, should be called with await.
+    @arg {string} image_url - URL of the image in the Internet. It will be a "body" of the message.
+    @arg {function} [on_progress = undefined] - progress callback. Params are <code>(percent, extra_data)</code>. Percent is integer from 1 to 100.
+    @arg {string} [app = DEFAULT_APP] - "app" field of the message. Should be a string with length from 1 to 16.
+    @arg {string} [version = DEFAULT_VERSION] - "version" field of the message. Should be an integer, starting of 1.
+    @throws {Exception} if error occured.
+    @return {object} - result message object.
+    @function newImageMsgAsync
+*/
+exports.newImageMsgAsync = Promise.promisify(function (...args) {
+    const callback = args[args.length - 1];
+    let [ image_url, on_progress, app, version ] = args.slice(0, args.length - 1);
+    return exports.newImageMsg(image_url, callback, on_progress, app, version);
+});
 
 function forEachMessage(message_objects, begin_idx, end_idx, callback) {
     if (begin_idx === undefined) begin_idx = 0;
@@ -138,10 +248,10 @@ export function decode(private_memo_key, second_user_public_memo_key, message_ob
 }
 
 /**
-    Encodes string to send with private_message_operation. Uses writeVString, so format of data to encode is string length + string.
+    Encodes message to send with private_message_operation. Converts object to JSON string. Uses writeVString, so format of data to encode is string length + string.
     @arg {string|PrivateKey} from_private_memo_key - private memo key of "from"
     @arg {string|PublicKey} to_public_memo_key - private memo key of "to"
-    @arg {string} message - message to encode. Please use JSON string like: '{"app":"golos-id","version":1,"body":"World"}'.
+    @arg {object} message - message to encode.
     @arg {string|undefined} nonce - unique identifier of message. When editing message, set to its nonce. Otherwise keep undefined.
     @return {object} - Object with fields: nonce, checksum and message. To use in operation, nonce should be converted with toString(), and another fields are ready to use.
 */
@@ -154,7 +264,7 @@ export function encode(from_private_memo_key, to_public_memo_key, message, nonce
     const toKey = toPublicObj(to_public_memo_key);
 
     const mbuf = new ByteBuffer(ByteBuffer.DEFAULT_CAPACITY, ByteBuffer.LITTLE_ENDIAN)
-    mbuf.writeVString(message);
+    mbuf.writeVString(JSON.stringify(message));
     message = new Buffer(mbuf.copy(0, mbuf.offset).toBinary(), 'binary');
 
     let data = Aes.encrypt(fromKey,

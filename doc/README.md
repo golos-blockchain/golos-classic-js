@@ -1346,19 +1346,21 @@ Golos Blockchain provides instant messages subsystem, which allows users communi
 
 ### Encrypt and send
 
-Messages are stringified JSON objects. If you want they showing in Golos Blogs or Golos forums, you should use stringified JSON-objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `golos-id` and `version` as 1.
+Messages are JSON objects. If you want they showing in Golos Messenger (in golos.id, forums), you should use JSON objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `'golos-id'` and `version` as `'1'`.
 
-Stringified JSON-object message should be enciphered (uses SHA-512 with nonce, which is a UNIX timestamp-based unique identifier, and AES), and converted to HEX string. You can do it easy with `golos.messages.encode` function.
+To create a message, you should use the `golos.messages.newTextMsg` function.
 
-Example: 
+Message should correspond to the following rules:
+- `app` field should be a string with length from 1 to 16;
+- `version` field should be an integer, beginning from 1;
+- `body` should be a string.
 
-```
-let message = {
-    app: 'golos-id',
-    version: 1,
-    body: 'Hello world',
-}
-let data = golos.messages.encode('alice private memo key', 'bob public memo key', JSON.stringify(message));
+Next, message object should be JSON-stringified, enciphered (uses SHA-512 with nonce, which is a UNIX timestamp-based unique identifier, and AES), and converted to HEX string (`encrypted_message`). You can do it easy with `golos.messages.encode` function.
+
+Full example:
+
+```js
+let data = golos.messages.encode('alice private memo key', 'bob public memo key', golos.messages.newTextMsg('Hello world', 'golos-id', 1));
 
 const json = JSON.stringify(['private_message', {
     from: 'alice',
@@ -1380,11 +1382,60 @@ golos.broadcast.customJson('alice private posting key', [], ['alice'], 'private_
 
 Messages are identifying by from+to+nonce, so when you updating message, you should encode it with same nonce as in its previous version.
 
-```
-data = golos.messages.encode('alice private memo key', 'bob public memo key', JSON.stringify(message), data.nonce);
+```js
+data = golos.messages.encode('alice private memo key', 'bob public memo key', golos.messages.newTextMsg('Goodbye world', 'golos-id', 1), data.nonce);
 ```
 
 Next, this data should be sent with `private_message` operation, same as in previous case, but with `update` = `true`.
+
+### Image messages
+
+Image messages, same as text messages, are JSON objects. Besides `app` and `version` fields, these messages should contain following fields:
+- `body` field, which should be a string, containing an Internet URL of the image (its full version);
+- `type` field, which should be equal to `'image'`. It identifies the message as an image message;
+- `previewWidth` and `previewHeight` fields, which are the integers, computed by fitting an image to the preview area (600x300px). (See this algorithm in `fitImageToSize` function in the source code of this repository).
+
+You should create image messages with `golos.messages.newImageMsgAsync` and `golos.messages.newImageMsg` functions. (These functions return an image message with computed `previewWidth` and `previewHeight`).
+
+**Warning:** Golos Blockchain willn't download this image and store its content. It will just store the URL. Thefore, you should provide an URL of image, storing in some reliable image hosting, which will never delete this message.
+
+**Also, it is strongly recommended to use the `https://`**. Some clients (incl. our official ones) may not support the `http://` in the Content Security Policy, they willn't show such images.
+
+Full example (asynchronous, should run in `async function`):
+
+```js
+let msg;
+try {
+    msg = await golos.messages.newImageMsgAsync('https://site.com/https-is-recommended.jpg', (progress, extra_data) => {
+        console.log('Progress: %i%', progress);
+        // also, if error occured, you can get error in extra_data.error
+    }, 'golos-id', 1);
+} catch (err) {
+    alert(err);
+    console.error(err);
+}
+if (msg) {
+    let data = golos.messages.encode('alice private memo key', 'bob public memo key', msg);
+    // ...and send it same as a text message
+}
+```
+
+Full example #2 (synchronous):
+
+```js
+golos.messages.newImageMsg('https://site.com/https-is-recommended.jpg', (err, msg) => {
+        if (err) {
+            alert(err);
+            console.error(err);
+        } else {
+            let data = golos.messages.encode('alice private memo key', 'bob public memo key', msg);
+            // ...and send it same as a text message
+        }
+    }, (progress, extra_data) => {
+        console.log('Progress: %i%', progress);
+        // also, if error occured, you can get error in extra_data.error
+    }, 'golos-id', 1);
+```
 
 ### Obtain and decrypt
 
@@ -1397,10 +1448,10 @@ golos.api.getThread('alice', 'bob', {}, (err, results) => {
 });
 ```
 
-**Note:** it also validates messages to correspond the following rules:
-- message should be a correct JSON object, with fields corresponding to rules below;
+**Note:** it also validates messages to correspond to the following rules:
+- message should be a correct JSON object, with fields conforming to the next rules;
 - `app` field should be a string with length from 1 to 16;
-- `version` field should be an integer, starting from 1;
+- `version` field should be an integer, beginning from 1;
 - `body` should be a string;
 - for image messages: `previewWidth` and `previewHeight` should be the integers, which are result of fitting an image to 600x300 px area. 
 
