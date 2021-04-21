@@ -9,8 +9,8 @@ import {fitImageToSize} from '../utils';
 const {isInteger} = Number
 
 /** @const {string} DEFAULT_APP 
-    @default 'golos-id' */
-export const DEFAULT_APP = 'golos-id';
+    @default 'golos-messenger' */
+export const DEFAULT_APP = 'golos-messenger';
 /** @const {string} DEFAULT_VERSION 
     @default 1 */
 export const DEFAULT_VERSION = 1;

@@ -709,7 +709,7 @@ golos.broadcast.limitOrderCreate(wif, owner, orderid, amountToSell, minToReceive
 ```js
 let wif = '5JVFFWRLwz6JoP9kguuRFfytToGU6cLgBVTL9t6NB3D3BQLbUBS'; // active private key
 
-let orderid = Math.floor(Date.now() / 1000); // it is golos.id way and it is preferred
+let orderid = Math.floor(Date.now() / 1000); // it is golos-ui way and it is preferred
 
 let expiration = new Date();
 expiration.setHours(expiration.getHours() + 1);
@@ -1193,7 +1193,7 @@ golos.broadcast.cancelTransferFromSavings(wif, from, requestId, function(err, re
 ```
 ### Donate
 ```
-golos.broadcast.donate(wif, 'alice', 'bob', '1.000 GOLOS', {app: 'golos-id', version: 1, comment: 'Hello', target: {author: 'bob', permlink: 'test'}}, [], function(err, result) {
+golos.broadcast.donate(wif, 'alice', 'bob', '1.000 GOLOS', {app: 'golos-blog', version: 1, comment: 'Hello', target: {author: 'bob', permlink: 'test'}}, [], function(err, result) {
   console.log(err, result);
 });
 ```
@@ -1346,7 +1346,7 @@ Golos Blockchain provides instant messages subsystem, which allows users communi
 
 ### Encrypt and send
 
-Messages are JSON objects. If you want they showing in Golos Messenger (in golos.id, forums), you should use JSON objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `'golos-id'` and `version` as `'1'`.
+Messages are JSON objects. If you want they showing in Golos Messenger (in blogs, forums), you should use JSON objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `'golos-messenger'` and `version` as `'1'`.
 
 To create a message, you should use the `golos.messages.newTextMsg` function.
 
@@ -1360,7 +1360,7 @@ Next, message object should be JSON-stringified, enciphered (uses SHA-512 with n
 Full example:
 
 ```js
-let data = golos.messages.encode('alice private memo key', 'bob public memo key', golos.messages.newTextMsg('Hello world', 'golos-id', 1));
+let data = golos.messages.encode('alice private memo key', 'bob public memo key', golos.messages.newTextMsg('Hello world', 'golos-messenger', 1));
 
 const json = JSON.stringify(['private_message', {
     from: 'alice',
@@ -1383,7 +1383,7 @@ golos.broadcast.customJson('alice private posting key', [], ['alice'], 'private_
 Messages are identifying by from+to+nonce, so when you updating message, you should encode it with same nonce as in its previous version.
 
 ```js
-data = golos.messages.encode('alice private memo key', 'bob public memo key', golos.messages.newTextMsg('Goodbye world', 'golos-id', 1), data.nonce);
+data = golos.messages.encode('alice private memo key', 'bob public memo key', golos.messages.newTextMsg('Goodbye world', 'golos-messenger', 1), data.nonce);
 ```
 
 Next, this data should be sent with `private_message` operation, same as in previous case, but with `update` = `true`.
@@ -1409,7 +1409,7 @@ try {
     msg = await golos.messages.newImageMsgAsync('https://site.com/https-is-recommended.jpg', (progress, extra_data) => {
         console.log('Progress: %i%', progress);
         // also, if error occured, you can get error in extra_data.error
-    }, 'golos-id', 1);
+    }, 'golos-messenger', 1);
 } catch (err) {
     alert(err);
     console.error(err);
@@ -1434,7 +1434,7 @@ golos.messages.newImageMsg('https://site.com/https-is-recommended.jpg', (err, ms
     }, (progress, extra_data) => {
         console.log('Progress: %i%', progress);
         // also, if error occured, you can get error in extra_data.error
-    }, 'golos-id', 1);
+    }, 'golos-messenger', 1);
 ```
 
 ### Obtain and decrypt
