@@ -286,7 +286,7 @@ export function encode(from_private_memo_key, to_public_memo_key, message, nonce
     @arg {int|undefined} end_idx - if set, function will process messages only before it index (excl.). If end_idx < begin_idx, messages will be processed in reversed order.
     @return {array} - result array of operations, which can be sent in single transaction.
 */
-export function makeGroups(message_objects, condition, wrapper, begin_idx, end_idx) {
+export function makeDatedGroups(message_objects, condition, wrapper, begin_idx, end_idx) {
     assert(message_objects, 'message_objects is required');
     assert(condition, 'condition is required');
     assert(wrapper, 'wrapper is required');
