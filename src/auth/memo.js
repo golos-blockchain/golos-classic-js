@@ -1,4 +1,3 @@
-
 import ByteBuffer from 'bytebuffer'
 import assert from 'assert'
 import base58 from 'bs58'
