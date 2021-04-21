@@ -728,7 +728,7 @@ golos.broadcast.limitOrderCreate(wif, owner, orderid, amountToSell, minToReceive
 ```js
 let wif = '5JVFFWRLwz6JoP9kguuRFfytToGU6cLgBVTL9t6NB3D3BQLbUBS'; // active private key
 
-let orderid = Math.floor(Date.now() / 1000); // it is golos.id way and it is preferred
+let orderid = Math.floor(Date.now() / 1000); // it is golos-ui way and it is preferred
 
 let expiration = new Date();
 expiration.setHours(expiration.getHours() + 1);
@@ -1212,7 +1212,7 @@ golos.broadcast.cancelTransferFromSavings(wif, from, requestId, function(err, re
 ```
 ### Donate
 ```
-golos.broadcast.donate(wif, 'alice', 'bob', '1.000 GOLOS', {app: 'golos-id', version: 1, comment: 'Hello', target: {author: 'bob', permlink: 'test'}}, [], function(err, result) {
+golos.broadcast.donate(wif, 'alice', 'bob', '1.000 GOLOS', {app: 'golos-blog', version: 1, comment: 'Hello', target: {author: 'bob', permlink: 'test'}}, [], function(err, result) {
   console.log(err, result);
 });
 ```
@@ -1365,19 +1365,21 @@ Golos Blockchain provides instant messages subsystem, which allows users communi
 
 ### Encrypt and send
 
-Messages are stringified JSON objects. If you want they showing in Golos Blogs or Golos forums, you should use stringified JSON-objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `golos-id` and `version` as 1.
+Messages are JSON objects. If you want they showing in Golos Messenger (in blogs, forums), you should use JSON objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `'golos-messenger'` and `version` as `'1'`.
 
-Stringified JSON-object message should be enciphered (uses SHA-512 with nonce, which is a UNIX timestamp-based unique identifier, and AES), and converted to HEX string. You can do it easy with `golos.messages.encode` function.
+To create a message, you should use the `golos.messages.newTextMsg` function.
 
-Example: 
+Message should correspond to the following rules:
+- `app` field should be a string with length from 1 to 16;
+- `version` field should be an integer, beginning from 1;
+- `body` should be a string.
 
-```
-let message = {
-    app: 'golos-id',
-    version: 1,
-    body: 'Hello world',
-}
-let data = golos.messages.encode('alice private memo key', 'bob public memo key', JSON.stringify(message));
+Next, message object should be JSON-stringified, enciphered (uses SHA-512 with nonce, which is a UNIX timestamp-based unique identifier, and AES), and converted to HEX string (`encrypted_message`). You can do it easy with `golos.messages.encode` function.
+
+Full example:
+
+```js
+let data = golos.messages.encode('alice private memo key', 'bob public memo key', golos.messages.newTextMsg('Hello world', 'golos-messenger', 1));
 
 const json = JSON.stringify(['private_message', {
     from: 'alice',
@@ -1399,46 +1401,105 @@ golos.broadcast.customJson('alice private posting key', [], ['alice'], 'private_
 
 Messages are identifying by from+to+nonce, so when you updating message, you should encode it with same nonce as in its previous version.
 
-```
-data = golos.messages.encode('alice private memo key', 'bob public memo key', JSON.stringify(message), data.nonce);
+```js
+data = golos.messages.encode('alice private memo key', 'bob public memo key', golos.messages.newTextMsg('Goodbye world', 'golos-messenger', 1), data.nonce);
 ```
 
 Next, this data should be sent with `private_message` operation, same as in previous case, but with `update` = `true`.
 
+### Image messages
+
+Image messages, same as text messages, are JSON objects. Besides `app` and `version` fields, these messages should contain following fields:
+- `body` field, which should be a string, containing an Internet URL of the image (its full version);
+- `type` field, which should be equal to `'image'`. It identifies the message as an image message;
+- `previewWidth` and `previewHeight` fields, which are the integers, computed by fitting an image to the preview area (600x300px). (See this algorithm in `fitImageToSize` function in the source code of this repository).
+
+You should create image messages with `golos.messages.newImageMsgAsync` and `golos.messages.newImageMsg` functions. (These functions return an image message with computed `previewWidth` and `previewHeight`).
+
+**Warning:** Golos Blockchain willn't download this image and store its content. It will just store the URL. Thefore, you should provide an URL of image, storing in some reliable image hosting, which will never delete this message.
+
+**Also, it is strongly recommended to use the `https://`**. Some clients (incl. our official ones) may not support the `http://` in the Content Security Policy, they willn't show such images.
+
+Full example (asynchronous, should run in `async function`):
+
+```js
+let msg;
+try {
+    msg = await golos.messages.newImageMsgAsync('https://site.com/https-is-recommended.jpg', (progress, extra_data) => {
+        console.log('Progress: %i%', progress);
+        // also, if error occured, you can get error in extra_data.error
+    }, 'golos-messenger', 1);
+} catch (err) {
+    alert(err);
+    console.error(err);
+}
+if (msg) {
+    let data = golos.messages.encode('alice private memo key', 'bob public memo key', msg);
+    // ...and send it same as a text message
+}
+```
+
+Full example #2 (synchronous):
+
+```js
+golos.messages.newImageMsg('https://site.com/https-is-recommended.jpg', (err, msg) => {
+        if (err) {
+            alert(err);
+            console.error(err);
+        } else {
+            let data = golos.messages.encode('alice private memo key', 'bob public memo key', msg);
+            // ...and send it same as a text message
+        }
+    }, (progress, extra_data) => {
+        console.log('Progress: %i%', progress);
+        // also, if error occured, you can get error in extra_data.error
+    }, 'golos-messenger', 1);
+```
+
 ### Obtain and decrypt
 
-Message can be obtained with `golos.api.getThread`, each message is object with `from_memo_key`, `to_memo_key`, `nonce`, `checksum`, `encrypted_message` and another fields. Next message can be decrypted with `golos.memo.decode` which supports batch processing (can decrypt few messages at once) and provides good performance.
+Message can be obtained with `golos.api.getThread`, each message is object with `from_memo_key`, `to_memo_key`, `nonce`, `checksum`, `encrypted_message` and another fields. Next, message can be decrypted with `golos.messages.decode` which supports batch processing (can decrypt few messages at once) and provides good performance.
 
-```
+```js
 golos.api.getThread('alice', 'bob', {}, (err, results) => {
     results = golos.messages.decode('alice private key', 'bob public memo key', results);
-    alert(results[0].message);
+    alert(results[0].message.body);
 });
 ```
+
+**Note:** it also validates messages to correspond to the following rules:
+- message should be a correct JSON object, with fields conforming to the next rules;
+- `app` field should be a string with length from 1 to 16;
+- `version` field should be an integer, beginning from 1;
+- `body` should be a string;
+- for image messages: `previewWidth` and `previewHeight` should be the integers, which are result of fitting an image to 600x300 px area. 
+
+**Note:** if message cannot be decoded, parsed as JSON and/or validated, it still adding to result, but has `message: null` (if cannot be parsed as JSON, or validated), and `raw_message: null` (if cannot be decoded at all). Such behaviour allows client to mark this message as read, but not display it to user. If you want to change this behaviour, you can use `on_error` parameter in `golos.messages.decode` (see the source code for more details).
 
 ### Mark Messages Read & Delete Messages
 
 Blockchain provides `private_mark_message` operation for marking messages as read, and `private_delete_message` to delete them.
-Each of these operations can be used one of two cases:
+Each of these operations can be used by one of two cases:
 - to process 1 message: set `nonce` to message nonce,
 - to process range of few messages: set `start_date` to (1st message's create_date minus 1 sec), and `stop-date` to last message's create_date.
 Also, you can process multiple ranges of messages by combining few operations in single transaction.
 
 **Note: you should not use case with `nonce` if processing 2 or more sequential messages.**
 
-To make ranges, you can use `golos.messages.makeGroups`, which builds such ranges by a condition, and can wrap them into real operations in-place.
+To make ranges, you can use `golos.messages.makeDatedGroups`, which builds such ranges by a condition, and can wrap them into real operations in-place.
 
 It accepts decoded messages from `golos.messages.decode`.
 
 **Note: function should iterate messages from end to start.**
 
-```
-let results = golos.messages.makeGroups(messages, (message_object, idx) => {
+```js
+let operations = golos.messages.makeDatedGroups(messages, (message_object, idx) => {
     return message_object.read_date.startsWith('19') && message_object.from !== 'bob'; // unread and not by bob
 }, (group, indexes, results) => {
-    const json = JSON.stringify(['private_mark_message', {
+    const json = JSON.stringify(['private_mark_message', { // or 'private_delete_message'
         from: 'alice',
         to: 'bob',
+        //requester: 'bob', // add it for delete case
         ...group,
     }]);
     return ['custom_json',
@@ -1448,7 +1509,15 @@ let results = golos.messages.makeGroups(messages, (message_object, idx) => {
             json,
         }
     ];
-}, 0, messages.length - 1); // specify right direction of iterating
+}, 0, messages.length); // specify right direction of iterating
+
+golos.broadcast.send({
+        operations,
+        extensions: []
+    }, ['bob private posting key'], (err, result) => {
+    alert(err);
+    alert(JSON.stringify(result));
+});
 ```
 
 # Formatter
