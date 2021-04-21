@@ -1346,7 +1346,7 @@ Golos Blockchain provides instant messages subsystem, which allows users communi
 
 ### Encrypt and send
 
-Messages are JSON objects. If you want they showing in Golos Messenger (in blogs, forums), you should use JSON objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `'golos-messenger'` and `version` as `'1'`.
+Messages are JSON objects. If you want they showing in Golos Messenger (in blogs, forums), you should use JSON objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `'golos-messenger'` and `version` as `1`.
 
 To create a message, you should use the `golos.messages.newTextMsg` function.
 
@@ -1365,7 +1365,7 @@ let data = golos.messages.encode('alice private memo key', 'bob public memo key'
 const json = JSON.stringify(['private_message', {
     from: 'alice',
     to: 'bob',
-    nonce: data.nonce.toString(),
+    nonce: data.nonce,
     from_memo_key: 'alice PUBLIC memo key',
     to_memo_key: 'bob public memo key',
     checksum: data.checksum,
@@ -1439,9 +1439,9 @@ golos.messages.newImageMsg('https://site.com/https-is-recommended.jpg', (err, ms
 
 ### Obtain and decrypt
 
-Message can be obtained with `golos.api.getThread`, each message is object with `from_memo_key`, `to_memo_key`, `nonce`, `checksum`, `encrypted_message` and another fields. Next message can be decrypted with `golos.memo.decode` which supports batch processing (can decrypt few messages at once) and provides good performance.
+Message can be obtained with `golos.api.getThread`, each message is object with `from_memo_key`, `to_memo_key`, `nonce`, `checksum`, `encrypted_message` and another fields. Next, message can be decrypted with `golos.messages.decode` which supports batch processing (can decrypt few messages at once) and provides good performance.
 
-```
+```js
 golos.api.getThread('alice', 'bob', {}, (err, results) => {
     results = golos.messages.decode('alice private key', 'bob public memo key', results);
     alert(results[0].message.body);
@@ -1460,26 +1460,27 @@ golos.api.getThread('alice', 'bob', {}, (err, results) => {
 ### Mark Messages Read & Delete Messages
 
 Blockchain provides `private_mark_message` operation for marking messages as read, and `private_delete_message` to delete them.
-Each of these operations can be used one of two cases:
+Each of these operations can be used by one of two cases:
 - to process 1 message: set `nonce` to message nonce,
 - to process range of few messages: set `start_date` to (1st message's create_date minus 1 sec), and `stop-date` to last message's create_date.
 Also, you can process multiple ranges of messages by combining few operations in single transaction.
 
 **Note: you should not use case with `nonce` if processing 2 or more sequential messages.**
 
-To make ranges, you can use `golos.messages.makeGroups`, which builds such ranges by a condition, and can wrap them into real operations in-place.
+To make ranges, you can use `golos.messages.makeDatedGroups`, which builds such ranges by a condition, and can wrap them into real operations in-place.
 
 It accepts decoded messages from `golos.messages.decode`.
 
 **Note: function should iterate messages from end to start.**
 
-```
-let results = golos.messages.makeGroups(messages, (message_object, idx) => {
+```js
+let operations = golos.messages.makeDatedGroups(messages, (message_object, idx) => {
     return message_object.read_date.startsWith('19') && message_object.from !== 'bob'; // unread and not by bob
-}, (group, indexes, results) => {
-    const json = JSON.stringify(['private_mark_message', {
+}, (group) => {
+    const json = JSON.stringify(['private_mark_message', { // or 'private_delete_message'
         from: 'alice',
         to: 'bob',
+        //requester: 'bob', // add it for delete case
         ...group,
     }]);
     return ['custom_json',
@@ -1489,7 +1490,15 @@ let results = golos.messages.makeGroups(messages, (message_object, idx) => {
             json,
         }
     ];
-}, 0, messages.length - 1); // specify right direction of iterating
+}, 0, messages.length); // specify right direction of iterating
+
+golos.broadcast.send({
+        operations,
+        extensions: []
+    }, ['bob private posting key'], (err, result) => {
+    alert(err);
+    alert(JSON.stringify(result));
+});
 ```
 
 # Formatter
