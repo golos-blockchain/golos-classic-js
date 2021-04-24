@@ -310,6 +310,25 @@ golos.api.getAccounts(accounts, function(err, result) {
   else console.error(err);
 });
 ```
+### Get Accounts Balances
+```
+golos.api.getAccountsBalances(accounts, function(err, result) {
+  console.log(err, result);
+});
+```
+#### Example:
+```js
+var accounts = [ 'epexa', 'epexa2' ];
+golos.api.getAccountsBalances(accounts, function(err, result) {
+  //console.log(err, result);
+  if (!err) {
+    result.forEach(function(item) {
+        console.log('Account\'s UIAs', item);
+    });
+  }
+  else console.error(err);
+});
+```
 ### Lookup Account Names
 ```
 golos.api.lookupAccountNames(accountNames, function(err, result) {
