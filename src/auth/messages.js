@@ -162,15 +162,15 @@ function forEachMessage(message_objects, begin_idx, end_idx, callback) {
     @arg {string|PrivateKey} private_memo_key - private memo key of "from" or "to".
     @arg {string|PublicKey} second_user_public_memo_key - public memo key of second user.
     @arg {array} message_objects - array of objects. Each object should contain nonce, checksum and encrypted_message (such object returns from private_message API).
+    @arg {function} [before_decode = undefined] - callback, calling on each message before processing. Params are <code>(message, idx, results)</code>. If returns true, message will not be processed. Also, you can push it to <code>results</code> manually.
     @arg {function} [for_each = undefined] - callback, calling on each message, after message is decoded, parsed and validated, but before add it to result array. Params are <code>(message, idx)</code>. If returns true, message willn't be added to result array.
+    @arg {function} [on_error = undefined] - callback, calling on each message which can't be decrypted, parsed, validated, or if <code>for_each</code> throws. Params are <code>(message, idx, exception)</code>. If returns true, message willn't be added to result array.
     @arg {int} [begin_idx = undefined] - if set, function will process messages only from this index (incl.). If begin_idx > end_idx, messages will be processed in reversed order.
     @arg {int} [end_idx = undefined] - if set, function will process messages only before this index (excl.). If end_idx < begin_idx, messages will be processed in reversed order.
-    @arg {function} [on_error = undefined] - callback, calling on each message which can't be decrypted, parsed, validated, or if <code>for_each</code> throws. Params are <code>(message, idx, exception)</code>. If returns true, message willn't be added to result array.
-    @arg {function} [before_decode = undefined] - callback, calling on each message before processing. Params are <code>(message, idx, results)</code>. If returns true, message will not be processed. Also, you can push it to <code>results</code> manually.
     @arg {bool} [raw_messages = false] - if set, function will not parse messages as JSON and validate them.
     @return {array} - result array of message_objects. Each object has "message" and "raw_message" fields. If message is invalid, it has only "raw_message" field. And if message cannot be decoded at all, it hasn't any of these fields.
 */
-export function decode(private_memo_key, second_user_public_memo_key, message_objects, for_each = undefined, begin_idx = undefined, end_idx = undefined, on_error = undefined, before_decode = undefined, raw_messages = false) {
+export function decode(private_memo_key, second_user_public_memo_key, message_objects, before_decode = undefined, for_each = undefined, on_error = undefined, begin_idx = undefined, end_idx = undefined, raw_messages = false) {
     assert(private_memo_key, 'private_memo_key is required');
     assert(second_user_public_memo_key, 'second_user_public_memo_key is required');
     assert(message_objects, 'message_objects is required');
