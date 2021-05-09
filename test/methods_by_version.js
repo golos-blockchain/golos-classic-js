@@ -1,4 +1,4 @@
-export const methods_0_18_0 = [
+export const methods_0_25_3 = [
     "get_account_reputations",
     "get_blog",
     "get_blog_authors",
@@ -14,10 +14,12 @@ export const methods_0_18_0 = [
     "get_account_history",
     "get_account_votes",
     "get_donates",
+    "get_donates_for_targets",
     "get_accounts",
     "get_active_votes",
     "get_active_witnesses",
     "get_all_content_replies",
+    "get_all_discussions_by_active",
     "get_block",
     "get_block_header",
     "get_chain_properties",
@@ -51,6 +53,7 @@ export const methods_0_18_0 = [
     "get_hardfork_version",
     "get_key_references",
     "get_languages",
+    "get_last_reply",
     "get_miner_queue",
     "get_next_scheduled_hardfork",
     "get_ops_in_block",
@@ -58,6 +61,7 @@ export const methods_0_18_0 = [
     "get_order_book_extended",
     "get_open_orders",
     "get_owner_history",
+    "get_fillable_orders",
     "get_potential_signatures",
     "get_proposed_transactions",
     "get_recovery_request",
@@ -65,6 +69,7 @@ export const methods_0_18_0 = [
     "get_required_signatures",
     "get_savings_withdraw_from",
     "get_savings_withdraw_to",
+    "get_tags",
     "get_tags_used_by_author",
     "get_transaction",
     "get_transaction_hex",
@@ -95,7 +100,7 @@ export const methods_0_18_0 = [
     "get_inbox",
     "get_outbox",
     "get_thread",
-    "get_settings",
+    "get_private_messages_settings",
     "get_contacts_size",
     "get_contact_info",
     "get_contacts",
@@ -104,4 +109,6 @@ export const methods_0_18_0 = [
     "setPrivateMessageCallback",
     "get_worker_requests",
     "get_worker_request_votes",
+    "get_values",
+    "get_values_settings"
 ]
