@@ -1365,7 +1365,7 @@ Golos Blockchain provides instant messages subsystem, which allows users communi
 
 ### Encrypt and send
 
-Messages are JSON objects. If you want they showing in Golos Messenger (in blogs, forums), you should use JSON objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `'golos-messenger'` and `version` as `'1'`.
+Messages are JSON objects. If you want they showing in Golos Messenger (in blogs, forums), you should use JSON objects with `body` field which containing string with text of message, and also, with `app` and `version` fields which are describing your client app. Also, you can add any custom fields. But if you using only `body`, we recommend you set `app` as `'golos-messenger'` and `version` as `1`.
 
 To create a message, you should use the `golos.messages.newTextMsg` function.
 
@@ -1384,7 +1384,7 @@ let data = golos.messages.encode('alice private memo key', 'bob public memo key'
 const json = JSON.stringify(['private_message', {
     from: 'alice',
     to: 'bob',
-    nonce: data.nonce.toString(),
+    nonce: data.nonce,
     from_memo_key: 'alice PUBLIC memo key',
     to_memo_key: 'bob public memo key',
     checksum: data.checksum,
@@ -1495,7 +1495,7 @@ It accepts decoded messages from `golos.messages.decode`.
 ```js
 let operations = golos.messages.makeDatedGroups(messages, (message_object, idx) => {
     return message_object.read_date.startsWith('19') && message_object.from !== 'bob'; // unread and not by bob
-}, (group, indexes, results) => {
+}, (group) => {
     const json = JSON.stringify(['private_mark_message', { // or 'private_delete_message'
         from: 'alice',
         to: 'bob',

@@ -1,4 +1,19 @@
 var assert = require('assert');
+import chai from 'chai';
+import sinon from 'sinon';
+import { mockHTMLImageElement } from './mock_image';
+
+global.sandbox = sinon.sandbox.create();
+
+sinon.assert.expose(chai.assert, {prefix: ''});
+
+beforeEach(function() {
+    mockHTMLImageElement();
+});
+
+afterEach(function() {
+    global.sandbox.restore();
+});
 
 module.exports = {
             
@@ -15,5 +30,11 @@ module.exports = {
         if (fail) {
             throw new Error("expecting " + message_substring);
         }
+    },
+
+    clockSpeed(fakeMsecs, realMsecs) {
+        var clock;
+        setInterval(() => { clock.tick(fakeMsecs); }, realMsecs);
+        clock = sandbox.useFakeTimers();
     }
 }
