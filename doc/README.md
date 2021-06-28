@@ -1520,6 +1520,57 @@ golos.broadcast.send({
 });
 ```
 
+### Replying
+
+Starting from 0.8.3, library supports replying to messages. For user, it works as following:
+- alice sends some message to bob;
+- bob clicks this message, then clicks "Reply", and writes some reply message;
+- messenger UI should display the quote of alice message on top of the bob message.
+
+**Note:** also, alice can reply bob message, which already contains his reply to her message. In this case, quotes should not be nested (we are not supporting it), alice just quotes body of bob message, without re-quoting her first message quote.
+
+You can reply messages of any type (text, image and any other), and your reply can be a message of any type, too.
+
+As a regular message, reply message is a JSON object, which has `app`, `version`, `body` and etc. But it also contains `quote` field. `quote` field is an object, and should contain the following fields:
+- `from` field is a nickname of "alice" (who wrote original message);
+- `nonce` field is a nonce of original message;
+- `type` field is a type of original message (for image message it should be `"image"`, and for text message it should be omitted);
+- `body` is a **truncated** text of original message. If it is image message, `body` should have length <= 2000. In any another case, it is <= 200. If it is image message and its URL is too long, `type` should be omitted, and `body` should be truncated to 200.
+
+This library provides `golos.messages.makeQuoteMsg` function, which can (and should) be used to easily construct reply messages, conforming to rules above. This function automatically truncates messages, so it works with any **valid** messages from `golos.messages.decode`.
+
+It can be used by 2 different approaches. You can choose any of them, which is more convenient for your architecture.
+
+#### Approach #1: Construct your message, and add a quote to it
+
+```js
+let msgOriginal = messages[0]; // messages is result returned from `golos.messages.decode`, with `from`, `nonce` and `message` field. It should be a valid (!) message object, otherwise makeQuoteMsg will throw
+
+let msg = golos.messages.newTextMsg('Bob!'); // let! not const, because makeQuoteMsg changes it
+golos.messages.makeQuoteMsg(msg, msgOriginal);
+// now encode msg as usually, and send it
+```
+
+#### Approach #2: Pre-construct quote, and then construct your message with quote
+
+```js
+let msgOriginal = messages[0];
+let quote = golos.messages.makeQuoteMsg({}, msgOriginal);
+...
+let msg = golos.messages.newTextMsg('Bob!'); // let! not const, because we will add quote here
+msg = {...msg, ...quote}; // add quote to message
+// now encode msg as usually, and send it
+```
+
+#### Obtaining messages with quotes
+
+`golos.messages.decode` supports messages with quotes. Each such message has `quote` field in its `message` field. But, if `quote` of message is wrong (message composed with some wrong UI, which don't uses `makeQuoteMsg`, and composes quotes wrong), **the whole message object will be invalid**, and `message` field will be `null`.
+
+
+#### Editing messages with quotes
+
+To edit a message with quote, you should re-construct it with `newTextMsg`/`newImageMsg`/..., add the `quote` field (just get it from existing decoded message, not re-construct), and encode+send it as usually (see "Edit message" chapter).
+
 # Formatter
 
 ### Create Suggested Password

@@ -1,6 +1,6 @@
 import { assert } from 'chai';
-import { newTextMsg, newImageMsg, newImageMsgAsync,
-    DEFAULT_APP, DEFAULT_VERSION } from '../src/auth/messages';
+import { newTextMsg, newImageMsg, newImageMsgAsync, makeQuoteMsg,
+    DEFAULT_APP, DEFAULT_VERSION, MAX_TEXT_QUOTE_LENGTH, MAX_IMAGE_QUOTE_LENGTH } from '../src/auth/messages';
 import th from './test_helper';
 import { unmockHTMLImageElement, correctImageURL } from './mock_image';
 
@@ -405,4 +405,105 @@ describe('golos.messages_construct: newImageMsgAsync()', function() {
         }
         if (msg) assert.fail();
     })
+})
+
+describe('golos.messages_construct: makeQuoteMsg()', function() {
+    it('quote for null message', function() {
+        assert.throws(() => makeQuoteMsg(), 'quoted_message_object is required');
+    });
+
+    it('quote for message, but not message_object from golos.messages.decode', function() {
+        const orig = newTextMsg('How do you do?');
+        let quote = newTextMsg('All right!');
+        assert.throws(() => makeQuoteMsg(quote, orig), 'quoted_message_object should be one of VALID objects, returned by `golos.messages.decode`, and have "from" field');
+    });
+
+    it('normal case, short text message', function() {
+        const orig = {
+            from: 'danlarimer',
+            nonce: '123',
+            message: newTextMsg('a'.repeat(MAX_TEXT_QUOTE_LENGTH)),
+        };
+        let msg = newTextMsg('All right!');
+
+        let msgCopy = Object.assign({}, msg);
+        let msgRes = makeQuoteMsg(msgCopy, orig);
+        assert.isNotNull(msgRes);
+        assert.isNotNull(msgRes.quote);
+        assert.strictEqual(msgRes.quote.from, orig.from);
+        assert.strictEqual(msgRes.quote.nonce, orig.nonce);
+        assert.strictEqual(msgRes.quote.type, orig.message.type);
+        assert.strictEqual(msgRes.quote.body, orig.message.body);
+
+        assert.deepStrictEqual(msgRes, msgCopy);
+        assert.strictEqual(msg.quote, undefined);
+    });
+
+    it('long text message', function() {
+        const orig = {
+            from: 'danlarimer',
+            nonce: '123',
+            message: newTextMsg('a'.repeat(MAX_TEXT_QUOTE_LENGTH + 1)),
+        };
+        let msg = newTextMsg('All right!');
+
+        let msgRes = makeQuoteMsg(msg, orig);
+        assert.isNotNull(msgRes);
+        assert.isNotNull(msgRes.quote);
+        assert.strictEqual(msgRes.quote.from, orig.from);
+        assert.strictEqual(msgRes.quote.nonce, orig.nonce);
+        assert.strictEqual(msgRes.quote.type, orig.message.type);
+        assert.strictEqual(msgRes.quote.body, orig.message.body.substring(0, MAX_TEXT_QUOTE_LENGTH - 3) + '...');
+    });
+
+    it('image message', async function() {
+        assert.isTrue(correctImageURL.length > MAX_TEXT_QUOTE_LENGTH, 'too short correctImageURL for this test');
+
+        const orig = {
+            from: 'danlarimer',
+            nonce: '123',
+            message: await newImageMsgAsync(correctImageURL)
+        };
+        let msg = newTextMsg('All right!');
+
+        let msgRes = makeQuoteMsg(msg, orig);
+        assert.isNotNull(msgRes);
+        assert.isNotNull(msgRes.quote);
+        assert.strictEqual(msgRes.quote.from, orig.from);
+        assert.strictEqual(msgRes.quote.nonce, orig.nonce);
+        assert.strictEqual(msgRes.quote.type, orig.message.type);
+        assert.strictEqual(msgRes.quote.body, orig.message.body);
+    });
+
+    it('quote-first approach (null msg)', function() {
+        const orig = {
+            from: 'danlarimer',
+            nonce: '123',
+            message: newTextMsg('Hi!'),
+        };
+
+        let msgRes = makeQuoteMsg(null, orig);
+        assert.isNotNull(msgRes);
+        assert.isNotNull(msgRes.quote);
+        assert.strictEqual(msgRes.quote.from, orig.from);
+        assert.strictEqual(msgRes.quote.nonce, orig.nonce);
+        assert.strictEqual(msgRes.quote.type, orig.message.type);
+        assert.strictEqual(msgRes.quote.body, orig.message.body);
+    });
+
+    it('quote-first approach (empty-object msg)', function() {
+        const orig = {
+            from: 'danlarimer',
+            nonce: '123',
+            message: newTextMsg('Hi!'),
+        };
+
+        let msgRes = makeQuoteMsg({}, orig);
+        assert.isNotNull(msgRes);
+        assert.isNotNull(msgRes.quote);
+        assert.strictEqual(msgRes.quote.from, orig.from);
+        assert.strictEqual(msgRes.quote.nonce, orig.nonce);
+        assert.strictEqual(msgRes.quote.type, orig.message.type);
+        assert.strictEqual(msgRes.quote.body, orig.message.body);
+    });
 })

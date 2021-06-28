@@ -1,7 +1,8 @@
 import { assert } from 'chai';
 import cloneDeep from 'lodash/cloneDeep';
-import { encode, decode, newTextMsg, newImageMsgAsync,
-    DEFAULT_APP, DEFAULT_VERSION, MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT } from '../src/auth/messages';
+import { encode, decode, newTextMsg, newImageMsgAsync, makeQuoteMsg,
+    DEFAULT_APP, DEFAULT_VERSION, MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT,
+    MAX_TEXT_QUOTE_LENGTH, MAX_IMAGE_QUOTE_LENGTH } from '../src/auth/messages';
 import th from './test_helper';
 import { correctImageURL } from './mock_image';
 var sandbox = global.sandbox;
@@ -564,5 +565,112 @@ describe('golos.messages: decode()', function() {
         assert.lengthOf(resSl, 2);
         assert.deepStrictEqual(resSl[0], res[2]);
         assert.deepStrictEqual(resSl[1], res[3]);
+    })
+})
+
+describe('golos.messages: decode() replies', function() {
+    it('message', function() {
+        var msg = newTextMsg('Привет');
+        var enc = encode(alice.memo, bob.memo_pub, msg);
+        const orig = Object.assign({
+            from: 'alice',
+        }, enc);
+
+        var origDecoded = decode(alice.memo, bob.memo_pub, [orig]);
+
+        var msg2 = newTextMsg('Hi');
+        msg2 = makeQuoteMsg(msg2, origDecoded[0]);
+        var enc2 = encode(alice.memo, bob.memo_pub, msg2);
+        const reply = Object.assign({
+            from: 'bob',
+        }, enc2);
+
+        var bothDecoded = decode(alice.memo, bob.memo_pub, [orig, enc2]);
+        assert.lengthOf(bothDecoded, 2);
+        assert.strictEqual(bothDecoded[1].message.quote.from, bothDecoded[0].from);
+        assert.strictEqual(bothDecoded[1].message.quote.nonce, bothDecoded[0].nonce);
+        assert.strictEqual(bothDecoded[1].message.quote.body, bothDecoded[0].message.body);
+        assert.strictEqual(bothDecoded[1].message.quote.type, bothDecoded[0].message.type);
+    })
+
+    it('too long message', function() {
+        var msg = newTextMsg('a'.repeat(MAX_TEXT_QUOTE_LENGTH + 1));
+        var enc = encode(alice.memo, bob.memo_pub, msg);
+        const orig = Object.assign({
+            from: 'alice',
+        }, enc);
+
+        var origDecoded = decode(alice.memo, bob.memo_pub, [orig]);
+
+        var msg2 = newTextMsg('Hi');
+        msg2 = makeQuoteMsg(msg2, origDecoded[0]);
+        // keep its original length to make message invalid
+        msg2.quote.body = 'a'.repeat(MAX_TEXT_QUOTE_LENGTH + 1);
+        var enc2 = encode(alice.memo, bob.memo_pub, msg2);
+        const reply = Object.assign({
+            from: 'bob',
+        }, enc2);
+
+        var bothDecoded = decode(alice.memo, bob.memo_pub, [orig, enc2]);
+        assert.lengthOf(bothDecoded, 2);
+        assert.isNotNull(bothDecoded[1].raw_message);
+        assert.isNull(bothDecoded[1].message);
+    })
+
+    it('image message (its body can be long)', async function() {
+        assert.isTrue(correctImageURL.length > MAX_TEXT_QUOTE_LENGTH, 'too short correctImageURL for this test');
+
+        var msg = await newImageMsgAsync(correctImageURL);
+        var enc = encode(alice.memo, bob.memo_pub, msg);
+        const orig = Object.assign({
+            from: 'alice',
+        }, enc);
+
+        var origDecoded = decode(alice.memo, bob.memo_pub, [orig]);
+
+        var msg2 = newTextMsg('Hi');
+        msg2 = makeQuoteMsg(msg2, origDecoded[0]);
+        var enc2 = encode(alice.memo, bob.memo_pub, msg2);
+        const reply = Object.assign({
+            from: 'bob',
+        }, enc2);
+
+        var bothDecoded = decode(alice.memo, bob.memo_pub, [orig, enc2]);
+        assert.lengthOf(bothDecoded, 2);
+        assert.strictEqual(bothDecoded[1].message.quote.from, bothDecoded[0].from);
+        assert.strictEqual(bothDecoded[1].message.quote.nonce, bothDecoded[0].nonce);
+        assert.strictEqual(bothDecoded[1].message.quote.body, bothDecoded[0].message.body);
+        assert.strictEqual(bothDecoded[1].message.quote.type, bothDecoded[0].message.type);
+    })
+
+    it('image message (too long)', async function() {
+        var msg = {
+            body: 'a'.repeat(MAX_IMAGE_QUOTE_LENGTH + 1),
+            type: 'image',
+            app: DEFAULT_APP,
+            version: DEFAULT_VERSION,
+            previewWidth: MAX_PREVIEW_WIDTH,
+            previewHeight: MAX_PREVIEW_HEIGHT,
+        };
+        var enc = encode(alice.memo, bob.memo_pub, msg);
+        const orig = Object.assign({
+            from: 'alice',
+        }, enc);
+
+        var origDecoded = decode(alice.memo, bob.memo_pub, [orig]);
+
+        var msg2 = newTextMsg('Hi');
+        msg2 = makeQuoteMsg(msg2, origDecoded[0]);
+        var enc2 = encode(alice.memo, bob.memo_pub, msg2);
+        const reply = Object.assign({
+            from: 'bob',
+        }, enc2);
+
+        var bothDecoded = decode(alice.memo, bob.memo_pub, [orig, enc2]);
+        assert.lengthOf(bothDecoded, 2);
+        assert.strictEqual(bothDecoded[1].message.quote.from, bothDecoded[0].from);
+        assert.strictEqual(bothDecoded[1].message.quote.nonce, bothDecoded[0].nonce);
+        assert.strictEqual(bothDecoded[1].message.quote.body, bothDecoded[0].message.body.substring(0, MAX_TEXT_QUOTE_LENGTH - 3) + '...');
+        assert.strictEqual(bothDecoded[1].message.quote.type, undefined);
     })
 })
