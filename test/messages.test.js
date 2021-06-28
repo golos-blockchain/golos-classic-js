@@ -21,7 +21,7 @@ describe('golos.messages: encode()', function() {
         assert.throws(() => encode(alice.memo), 'to_public_memo_key is required');
         assert.throws(() => encode(alice.memo, bob.memo_pub), 'message is required');
 
-        assert.throws(() => encode(1, alice.memo, bob.memo_pub), 'Expected String');
+        assert.throws(() => encode(1, alice.memo, bob.memo_pub));
     })
 
     it('normal case', function() {
