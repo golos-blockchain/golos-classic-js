@@ -3,6 +3,7 @@ import ByteBuffer from 'bytebuffer'
 import assert from 'assert'
 import base58 from 'bs58'
 import Promise from 'bluebird';
+import truncate from 'lodash/truncate';
 import {Aes, PrivateKey, PublicKey} from './ecc'
 import {ops} from './serializer'
 import {fitImageToSize} from '../utils';
@@ -20,6 +21,12 @@ export const MAX_PREVIEW_WIDTH = 600;
 /** @const {string} MAX_PREVIEW_HEIGHT 
     @default 300 */
 export const MAX_PREVIEW_HEIGHT = 300;
+/** @const {string} MAX_TEXT_QUOTE_LENGTH
+    @default 200 */
+export const MAX_TEXT_QUOTE_LENGTH = 200;
+/** @const {string} MAX_IMAGE_QUOTE_LENGTH
+    @default 2000 */
+export const MAX_IMAGE_QUOTE_LENGTH = 2000;
 
 const toPrivateObj = o => (o ? o.d ? o : PrivateKey.fromWif(o) : o/*null or undefined*/)
 const toPublicObj = o => (o ? o.Q ? o : PublicKey.fromString(o) : o/*null or undefined*/)
@@ -41,6 +48,24 @@ function validateImageMsg(msg) {
 
     assert(isInteger(msg.previewHeight) && msg.previewHeight >= 1 && msg.previewHeight <= MAX_PREVIEW_HEIGHT,
         'message.previewHeight (for image) should be an integer, >= 1, <= ' + MAX_PREVIEW_HEIGHT);
+}
+
+function validateMsgWithQuote(msg) {
+    if (msg.quote !== undefined) {
+        assert(typeof msg.quote === 'object', 'message.quote should be an object or undefined at all');
+        assert(typeof msg.quote.from === 'string' && msg.quote.from.length >= 1 && msg.quote.from.length <= 16,
+            'message.quote.from should be a valid nickname of sender of message, to which this reply is');
+        assert(typeof msg.quote.nonce === 'string' && msg.quote.nonce.length,
+            'message.quote.nonce should be a valid nonce of message, to which this reply is');
+
+        if (msg.quote.type !== 'image') {
+            assert(typeof msg.quote.body === 'string' && msg.quote.body.length <= MAX_TEXT_QUOTE_LENGTH,
+                'message.quote.body should be a truncated (length <= 200) text of message, to which this reply is');
+        } else {
+            assert(typeof msg.quote.body === 'string' && msg.quote.body.length <= MAX_IMAGE_QUOTE_LENGTH,
+                'message.quote.body should be a truncated (length <= 2000) image URL from message, to which this reply is');
+        }
+    }
 }
 
 /**
@@ -143,6 +168,42 @@ exports.newImageMsgAsync = Promise.promisify(function (...args) {
     return exports.newImageMsg(image_url, callback, on_progress, app, version);
 });
 
+/**
+    Makes your message the reply to another message_object. Call it after `newTextMsg`/`newImageMsg`/etc, next call `encode`, and finally send resulting message as usually.
+    @arg {object} msg = Your message, created by `newTextMsg`, `newImageMsg`, etc.
+    @arg {object} quoted_message_object = Message to which you want to reply. It should be one of messages returned by `golos.messages.decode`, and have "from", "nonce", and (warning!) "message". If message is invalid (cannot be decoded), it has no "message" field, and if you try reply it, it will throw.
+    @throws {Exception} if quoted_message_object is invalid.
+    @return {object} - result message object, which can be encoded and sent.
+    @function newImageMsgAsync
+*/
+export function makeQuoteMsg(msg, quoted_message_object) {
+    assert(quoted_message_object, 'quoted_message_object is required');
+    const assertPrefix = 'quoted_message_object should be one of VALID objects, returned by `golos.messages.decode`';
+    assert(quoted_message_object.from, `${assertPrefix}, and have "from" field`);
+    assert(quoted_message_object.nonce, `${assertPrefix}, and have "nonce" field`);
+    assert(quoted_message_object.message, `${assertPrefix}, and have "message" field`);
+    assert(quoted_message_object.message.body, `${assertPrefix}, and have "message" field with "body"`);
+
+    let type = quoted_message_object.message.type;
+    let body = quoted_message_object.message.body;
+    if (type !== 'image') {
+        body = truncate(body, {length: MAX_TEXT_QUOTE_LENGTH, omission: '...'});
+    } else {
+        if (body.length > MAX_IMAGE_QUOTE_LENGTH) {
+            body = truncate(body, {length: MAX_TEXT_QUOTE_LENGTH, omission: '...'});
+            type = undefined; // make it text
+        }
+    }
+    if (!msg) msg = {};
+    msg.quote = {
+        from: quoted_message_object.from,
+        nonce: quoted_message_object.nonce,
+        body,
+    };
+    if (type) msg.quote.type = type;
+    return msg;
+}
+
 function forEachMessage(message_objects, begin_idx, end_idx, callback) {
     if (begin_idx === undefined) begin_idx = 0;
     if (end_idx === undefined) end_idx = message_objects.length;
@@ -227,6 +288,7 @@ export function decode(private_memo_key, second_user_public_memo_key, message_ob
                 if (msg.type === 'image')
                     validateImageMsg(msg);
                 validateAppVersion(msg.app, msg.version);
+                validateMsgWithQuote(msg);
                 message_object.message = msg;
             }
         } catch (exception) {

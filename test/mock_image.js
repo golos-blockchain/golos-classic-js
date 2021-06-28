@@ -1,4 +1,4 @@
-export const correctImageURL = 'https://i.imgur.com/w197Ch5.jpg'; 
+export const correctImageURL = 'http://images.golos.today/0x0/http://images.golos.today/0x0/http://images.golos.today/0x0/http://images.golos.today/0x0/http://images.golos.today/0x0/http://images.golos.today/0x0/https://i.imgur.com/w197Ch5.jpg';
 
 export class MockImageElement {
     set src(url) {
