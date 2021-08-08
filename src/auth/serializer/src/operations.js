@@ -915,6 +915,7 @@ let chain_properties_26 = new Serializer(
         asset_creation_fee: asset,
         invite_transfer_interval_sec: uint32,
         convert_fee_percent: uint16,
+        min_golos_power_to_curate: asset,
   }
 );
 
