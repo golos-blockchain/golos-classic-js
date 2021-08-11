@@ -31,7 +31,7 @@ $ npm install golos-classic-js --save
 or
 
 ```
-$ npm install git+https://github.com/golos-blockchain/golos-js.git --save
+$ npm install git+https://github.com/golos-blockchain/golos-lib-js.git --save
 ```
 
 # Browser 

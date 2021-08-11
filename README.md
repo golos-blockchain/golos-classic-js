@@ -9,7 +9,7 @@ $ npm install golos-classic-js --save
 ```
 
 Here is full documentation:
-https://github.com/golos-blockchain/golos-js/tree/master/doc
+https://github.com/golos-blockchain/golos-lib-js/tree/master/doc
 
 ## Browser 
 
@@ -63,7 +63,7 @@ golos.api.getAccounts(['ned', 'dan'], function(err, result) {
 });
 ```
 
-Other examples in the [documentation](https://github.com/golos-blockchain/golos-js/tree/master/doc).
+Other examples in the [documentation](https://github.com/golos-blockchain/golos-lib-js/tree/master/doc).
 
 ## Issues
 When you find issues, please report them!
