@@ -1689,8 +1689,11 @@ var golosPower = golos.formatter.estimateAccountValue(account);
 ### Reputation
 ```
 var reputation = golos.formatter.reputation(3512485230915);
-console.log(reputation);
-// => 56
+console.log(reputation); // => 56
+```
+```
+var reputation = golos.formatter.reputation(3512485230915, true);
+console.log(reputation); // => 56.90999065510658
 ```
 
 ### Vest To Golos
