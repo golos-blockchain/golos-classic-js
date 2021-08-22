@@ -1,6 +1,6 @@
 {
   "name": "golos-classic-js",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "description": "Golos-js the JavaScript library with API for GOLOS blockchain",
   "main": "lib/index.js",
   "scripts": {
@@ -68,8 +68,8 @@
     "mocha": "^3.0.2",
     "mocha-make-stub": "^2.3.2",
     "should": "^11.1.0",
-    "webpack": "^1.13.2",
-    "webpack-visualizer-plugin": "^0.1.5"
+    "webpack": "^3.12.0",
+    "webpack-bundle-analyzer": "^4.4.2"
   },
   "contributors": [
     "Fabien (https://github.com/bonustrack)",

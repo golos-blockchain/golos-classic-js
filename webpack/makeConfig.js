@@ -1,5 +1,5 @@
 'use strict';
-const Visualizer = require('webpack-visualizer-plugin');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 const _ = require('lodash');
 const path = require('path');
 const webpack = require('webpack');
@@ -13,14 +13,15 @@ function makePlugins(options) {
   const isDevelopment = options.isDevelopment;
 
   let plugins = [
-    new Visualizer({
-      filename: './statistics.html'
+    new BundleAnalyzerPlugin({
+      analyzerMode: 'static',
+      reportFilename: 'stats.html',
+      openAnalyzer: false,
     }),
   ];
 
   if (!isDevelopment) {
     plugins = plugins.concat([
-      new webpack.optimize.DedupePlugin(),
       new webpack.optimize.UglifyJsPlugin({
         output: {
           comments: false,
@@ -28,39 +29,14 @@ function makePlugins(options) {
         minimize: true,
         compress: {
           warnings: false,
-        }
+        },
+        sourceMap: true,
       }),
       new webpack.optimize.AggressiveMergingPlugin(),
     ]);
   }
 
   return plugins;
-}
-
-function makeStyleLoaders(options) {
-  if (options.isDevelopment) {
-    return [
-      {
-        test: /\.s[ac]ss$/,
-        loaders: [
-          'style',
-          'css?sourceMap',
-          'autoprefixer-loader?browsers=last 2 version',
-          'sass?sourceMap&sourceMapContents',
-        ],
-      },
-    ];
-  }
-
-  return [
-    {
-      test: /\.s[ac]ss$/,
-      loader: ExtractTextPlugin.extract(
-        'style-loader',
-        'css!autoprefixer-loader?browsers=last 2 version!sass'
-      ),
-    },
-  ];
 }
 
 function makeConfig(options) {
@@ -81,15 +57,11 @@ function makeConfig(options) {
     },
     plugins: makePlugins(options),
     module: {
-      loaders: [
+      rules: [
         {
           test: /\.js?$/,
           exclude: /node_modules/,
-          loader: 'babel',
-        },
-        {
-          test: /\.json?$/,
-          loader: 'json',
+          loader: 'babel-loader',
         },
       ],
     },
