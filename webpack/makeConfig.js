@@ -22,16 +22,6 @@ function makePlugins(options) {
 
   if (!isDevelopment) {
     plugins = plugins.concat([
-      new webpack.optimize.UglifyJsPlugin({
-        output: {
-          comments: false,
-        },
-        minimize: true,
-        compress: {
-          warnings: false,
-        },
-        sourceMap: true,
-      }),
       new webpack.optimize.AggressiveMergingPlugin(),
     ]);
   }
@@ -46,6 +36,7 @@ function makeConfig(options) {
   const isDevelopment = options.isDevelopment;
 
   return {
+    mode: isDevelopment ? 'development' : 'production',
     devtool: isDevelopment ? 'cheap-eval-source-map' : 'source-map',
     entry: {
       golos: path.join(options.baseDir, 'src/browser.js'),
