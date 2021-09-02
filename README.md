@@ -7,7 +7,7 @@ Golos.js the JavaScript API for Golos blockchain
 
 Maximum supported Golos version is 0.25.4. Newer versions can break some operations and API methods.
 
-Please use [golos-js-lib](https://npmjs.com/package/golos-lib-js) ([source code](https://github.com/golos-blockchain/libs)) instead.
+Please use [golos-lib-js](https://npmjs.com/package/golos-lib-js) ([source code](https://github.com/golos-blockchain/libs)) instead.
 
 ## Install
 ```
