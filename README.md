@@ -3,6 +3,12 @@ Golos.js the JavaScript API for Golos blockchain
 
 [![npm version](https://badge.fury.io/js/golos-classic-js.svg)](https://badge.fury.io/js/golos-classic-js)
 
+# THIS LIBRARY IS DEPRECATED
+
+Maximum supported Golos version is 0.25.4. Newer versions can break some operations and API methods.
+
+Please use [golos-js-lib](https://npmjs.com/package/golos-lib-js) ([source code](https://github.com/golos-blockchain/libs)) instead.
+
 ## Install
 ```
 $ npm install golos-classic-js --save
