@@ -21,6 +21,10 @@ class Golos extends EventEmitter {
     super(options);
     defaults(options, DEFAULTS);
     this.options = cloneDeep(options);
+    this._streamDefaults = {
+      mode: 'head',
+      startBlock: 0,
+    };
   }
   _setTransport(url) {
       if (url && url.match('^((http|https)?:\/\/)')) {
@@ -71,38 +75,49 @@ class Golos extends EventEmitter {
     return this.transport.send(api, data, callback);
   }
 
-  streamBlockNumber(mode = 'head', callback, ts = 200) {
-    if (typeof mode === 'function') {
-      callback = mode;
-      mode = 'head';
+  callReliable(method, ...args) {
+    const callback = args[args.length - 1];
+    const argsWithoutCb = args.slice(0, args.length - 1);
+    this[method](...argsWithoutCb, (err, result)  => {
+      if (err || !result) {
+        console.error(method + ' reliable call - fail, retrying... Cause:', err ? err.message : 'API returned null');
+        Promise.delay(1000).then(() => {
+          this.callReliable(method, ...args);
+        });
+        return;
+      }
+      callback(null, result);
+    });
+  };
+
+  streamBlockNumber(options, callback) {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
     }
-    let current = '';
+    defaults(options, this._streamDefaults);
+    let startBlock = options.startBlock;
+    let prevBlock = 0;
     let running = true;
 
     const update = () => {
       if (!running) return;
 
-      this.getDynamicGlobalPropertiesAsync()
+      this.callReliableAsync('getDynamicGlobalProperties')
         .then((result) => {
-          const blockId = mode === 'irreversible'
+          const currentBlock = options.mode === 'irreversible'
             ? result.last_irreversible_block_num
             : result.head_block_number;
 
-          if (blockId !== current) {
-            if (current) {
-              for (let i = current; i < blockId; i++) {
-                if (i !== current) {
-                  callback(null, i);
-                }
-                current = i;
-              }
-            } else {
-              current = blockId;
-              callback(null, blockId);
-            }
-          }
+          if (!startBlock)
+            startBlock = currentBlock;
 
-          Promise.delay(ts).then(() => {
+          for (let i = startBlock; i <= currentBlock; i++) {
+            callback(null, i);
+          }
+          startBlock = currentBlock + 1;
+
+          Promise.delay(1000).then(() => {
             update();
           });
         }, (err) => {
@@ -117,16 +132,17 @@ class Golos extends EventEmitter {
     };
   }
 
-  streamBlock(mode = 'head', callback) {
-    if (typeof mode === 'function') {
-      callback = mode;
-      mode = 'head';
+  streamBlock(options, callback) {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
     }
+    defaults(options, this._streamDefaults);
 
     let current = '';
     let last = '';
 
-    const release = this.streamBlockNumber(mode, (err, id) => {
+    const release = this.streamBlockNumber(options, (err, id) => {
       if (err) {
         release();
         callback(err);
@@ -136,29 +152,10 @@ class Golos extends EventEmitter {
       current = id;
       if (current !== last) {
         last = current;
-        this.getBlock(current, callback);
-      }
-    });
-
-    return release;
-  }
-
-  streamTransactions(mode = 'head', callback) {
-    if (typeof mode === 'function') {
-      callback = mode;
-      mode = 'head';
-    }
-
-    const release = this.streamBlock(mode, (err, result) => {
-      if (err) {
-        release();
-        callback(err);
-        return;
-      }
-
-      if (result && result.transactions) {
-        result.transactions.forEach((transaction) => {
-          callback(null, transaction);
+        this.callReliable('getBlock', current, (err, res) => {
+          res.block_num = current;
+          res.timestamp_prev = new Date(new Date(res.timestamp).getTime() - 3000).toISOString().split('.')[0];
+          callback(err, res);
         });
       }
     });
@@ -166,13 +163,38 @@ class Golos extends EventEmitter {
     return release;
   }
 
-  streamOperations(mode = 'head', callback) {
-    if (typeof mode === 'function') {
-      callback = mode;
-      mode = 'head';
+  streamTransactions(options, callback) {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
     }
+    defaults(options, this._streamDefaults);
 
-    const release = this.streamTransactions(mode, (err, transaction) => {
+    const release = this.streamBlock(options, (err, block) => {
+      if (err) {
+        release();
+        callback(err);
+        return;
+      }
+
+      if (block && block.transactions) {
+        block.transactions.forEach((transaction) => {
+          callback(null, transaction, block);
+        });
+      }
+    });
+
+    return release;
+  }
+
+  streamOperations(options = {}, callback) {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
+    }
+    defaults(options, this._streamDefaults);
+
+    const release = this.streamTransactions(options, (err, transaction, block) => {
       if (err) {
         release();
         callback(err);
@@ -180,7 +202,7 @@ class Golos extends EventEmitter {
       }
 
       transaction.operations.forEach((operation) => {
-        callback(null, operation);
+        callback(null, operation, transaction, block);
       });
     });
 

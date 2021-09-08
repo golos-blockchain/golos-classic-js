@@ -11,6 +11,7 @@
     - [Votes](#votes)
     - [Content](#content)
     - [Witnesses](#witnesses)
+    - [API Reliability](#api-reliability)
 - [Login](#login)
 - [Follow](#follow-api)
 - [Worker](#worker-api)
@@ -20,6 +21,7 @@
 - [Broadcast](#broadcast)
 - [Auth](#auth)
 - [Private Messages](#private-messages)
+- [Streaming Events](#streaming-events)
 - [Formatter](#formatter)
 - [Utils](#utils)
 
@@ -550,6 +552,30 @@ golos.api.lookupWitnessAccounts(lowerBoundName, limit, function(err, result) {
 golos.api.getActiveWitnesses(function(err, result) {
   console.log(err, result);
 });
+```
+
+## API Reliability
+
+By default, all API methods will fail, if where are some problems with Golos Blockchain, or network.
+
+But you can use `golos.api.callReliable` or `golos.api.callReliableAsync` to call any API method with infinity retrying until it proceeds.
+
+**Note: this feature is experimental now**, so API can be changed in future golos-lib versions.
+
+```js
+golos.api.callReliable('getDynamicGlobalProperties', (err, res) => {
+  console.log(res);
+});
+golos.api.callReliable('getContent', 'hipster', 'post-dobra', (err, res) => {
+  console.log(res);
+});
+```
+
+```js
+const res = await golos.api.callReliableAsync('getDynamicGlobalProperties');
+console.log(res);
+const res2 = await golos.api.callReliableAsync('getContent', 'hipster', 'post-dobra');
+console.log(res2);
 ```
 
 ## Login API
@@ -1571,6 +1597,72 @@ msg = {...msg, ...quote}; // add quote to message
 
 To edit a message with quote, you should re-construct it with `newTextMsg`/`newImageMsg`/..., add the `quote` field (just get it from existing decoded message, not re-construct), and encode+send it as usually (see "Edit message" chapter).
 
+# Streaming Events
+
+To instantly receive notifications about most of operations, Golos Blockchain provides [Golos Notify Service](https://github.com/golos-blockchain/golosnotify).
+
+But if these notifications aren't fit your purposes, and you require **all** of operations, you can use Golos-Lib Streaming directly.
+
+**Note: this feature is experimental now**, so API can be changed in future golos-lib versions.
+
+All streaming functions have 2 parameters - options and callback. Options parameter is an object, where fields are options.
+
+Default options are:
+```js
+{
+  mode: 'head', // Stream head blocks. Use 'irreversible' to stream last irreversible blocks. 
+  start_block: 0, // Block (in the past) from which to start streaming. 0 means to start from current block.
+}
+```
+
+Each option can be omitted, default option will be used. Also, whole options parameter can be omitted.
+
+**golos.api.streamBlockNumber(options, callback)**
+
+```js
+golos.api.streamBlockNumber({mode: 'head'}, (err, blockNum) => {
+  console.log(blockNum);
+});
+```
+
+**golos.api.streamBlock(options, callback)**
+
+Streams all blocks, including empty ones (without operations),
+
+```js
+golos.api.streamBlock({mode: 'head'}, (err, block) => {
+  console.log(block); // this is same struct as in golos.api.getBlock...
+  // ...but also provides some extra fields:
+  console.log(block.block_num);
+  console.log(block.timestamp_prev); // Date and time, which will be assigned to all objects created in operations in this block
+});
+```
+
+**golos.api.streamTransactions(options, callback)**
+
+```js
+golos.api.streamTransactions({mode: 'head'}, (err, transaction, block) => {
+  console.log(transaction);
+  console.log(block); // Block which contains the transaction. Structure same as in streamBlock
+});
+```
+
+**golos.api.streamOperations(options, callback)**
+
+```js
+golos.api.streamOperations({mode: 'head'}, (err, operation, transaction, block) => {
+  console.log(operation); // Array. Example: ['transfer', {from: 'bob', to: 'alice', amount: '1000000.000 GOLOS', memo: 'Happy Birthday!'}]
+  console.log(transaction); // Transaction which contains operation. Structure same as in streamTransactions
+  console.log(block); // Block which contains the transaction. Structure same as in streamBlock
+});
+```
+
+**Reliability**
+
+Streaming is built on top of `golos.api.callReliable`, so if any problems with fetching events are occurring (network disconnect, Golos Blockchain failure), it will retry until current block will be fetched.
+
+Also, you can save each `block.block_num` to your database, and if *your* service fails (crashed, etc.), you can pass it to `start_block`, and get all data from that block to current block.
+
 # Formatter
 
 ### Create Suggested Password
@@ -1597,8 +1689,11 @@ var golosPower = golos.formatter.estimateAccountValue(account);
 ### Reputation
 ```
 var reputation = golos.formatter.reputation(3512485230915);
-console.log(reputation);
-// => 56
+console.log(reputation); // => 56
+```
+```
+var reputation = golos.formatter.reputation(3512485230915, true);
+console.log(reputation); // => 56.90999065510658
 ```
 
 ### Vest To Golos
